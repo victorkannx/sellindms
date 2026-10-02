@@ -22,7 +22,7 @@ Use the secure project secret input flow for these values; do not put them in so
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only product lookup, pending order persistence, verified fulfillment, and signed resource links |
 | `FLUTTERWAVE_SECRET_KEY` | Server-only Flutterwave checkout initialization and transaction verification |
 | `FLUTTERWAVE_WEBHOOK_SECRET` | Server-only validation of the Flutterwave `verif-hash` webhook header |
-| `APP_ORIGIN` | Browser-visible HTTPS origin used to create the Flutterwave callback URL |
+| `APP_ORIGIN` | Browser-visible HTTPS origin used for the Supabase Auth callback and Flutterwave callback URL |
 | `SUPABASE_RESOURCE_BUCKET` | Required only if an active resource uses `storage_path` instead of `external_url` |
 
 After deployment, configure Flutterwave to send its webhook to:

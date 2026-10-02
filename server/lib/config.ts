@@ -22,13 +22,14 @@ export const requireConfig = <T>(value: T | undefined, key: string): T => {
 };
 
 export const publicSupabaseConfig = () => {
-  if (!runtimeConfig.supabaseUrl || !runtimeConfig.supabaseAnonKey) {
+  if (!runtimeConfig.supabaseUrl || !runtimeConfig.supabaseAnonKey || !runtimeConfig.appOrigin) {
     return null;
   }
 
   return {
     supabaseUrl: runtimeConfig.supabaseUrl,
     supabaseAnonKey: runtimeConfig.supabaseAnonKey,
+    authCallbackUrl: `${safeAppOrigin()}/auth/callback`,
   };
 };
 

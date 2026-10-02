@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 export type PublicSupabaseConfig = {
   supabaseUrl: string;
   supabaseAnonKey: string;
+  authCallbackUrl: string;
 };
 
 let client: SupabaseClient | null = null;
@@ -31,6 +32,8 @@ export const getSupabase = async () => {
   });
   return client;
 };
+
+export const getAuthCallbackUrl = async () => (await fetchSupabaseConfig()).authCallbackUrl;
 
 export const clearSupabaseClient = () => {
   client = null;

@@ -68,7 +68,7 @@ app.get('/api/public/config', (_req, res) => {
       503,
       'SUPABASE_CLIENT_NOT_CONFIGURED',
       'Supabase client configuration is not available yet.',
-      { required: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'] },
+      { required: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'APP_ORIGIN'] },
     );
   }
   return res.json(config);

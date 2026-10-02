@@ -18,7 +18,7 @@ import {
   toggleFavorite,
   trackScriptView,
 } from './lib/data';
-import { getSupabase } from './lib/supabase';
+import { getAuthCallbackUrl, getSupabase } from './lib/supabase';
 import type { Entitlement, PaymentStatus, Product, Resource, Script, Taxonomy } from './types/domain';
 
 type CustomerContextValue = {
@@ -224,9 +224,14 @@ function AuthPanel({ supabase, purpose = 'continue' }: { supabase: SupabaseClien
     event.preventDefault();
     if (!supabase) return setError('Supabase authentication is not configured yet.');
     setError(null);
-    const { error: authError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: true } });
-    if (authError) return setError(authError.message);
-    setSubmitted(true);
+    try {
+      const authCallbackUrl = await getAuthCallbackUrl();
+      const { error: authError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: authCallbackUrl, shouldCreateUser: true } });
+      if (authError) throw authError;
+      setSubmitted(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'We could not send that sign-in link.');
+    }
   };
   if (submitted) return <div className="auth-success"><span>✓</span><h3>Check your inbox.</h3><p>We sent a secure sign-in link to <strong>{email}</strong>. Return here after you open it.</p></div>;
   return <form className="auth-form" onSubmit={submit}><label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label><button className="button button--accent" type="submit">Email me a sign-in link <span>→</span></button><p>Sign in to {purpose}. This does not grant library access—access is verified separately.</p>{error && <div className="form-error">{error}</div>}</form>;
@@ -295,6 +300,12 @@ function AuthCallback() {
   useEffect(() => {
     (async () => {
       try {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const hashError = hashParams.get('error_description') || hashParams.get('error');
+        if (hashError) {
+          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+          throw new Error('This sign-in link could not be completed. Request a fresh link and try again.');
+        }
         const supabase = await getSupabase();
         const code = new URLSearchParams(window.location.search).get('code');
         if (code) {
