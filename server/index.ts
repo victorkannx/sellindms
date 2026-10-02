@@ -8,9 +8,16 @@ import { authenticatedUser, getAdminClient, isActiveAccess } from './lib/supabas
 import {
   createPaymentReference,
   fulfillVerifiedTransaction,
+  getRefundTransactionId,
+  isCompletedRefundStatus,
+  isRefundWebhookPayload,
+  isTerminalChargeFailure,
   initializeFlutterwavePayment,
+  recordVerifiedTerminalFailure,
+  revokeVerifiedRefund,
   secureEqual,
   verifyFlutterwaveTransaction,
+  verifyFlutterwaveRefund,
   type ProductRecord,
 } from './services/flutterwave.js';
 
@@ -94,13 +101,32 @@ app.post('/api/payments/flutterwave/webhook', express.raw({ type: 'application/j
   }
 
   const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
-  const payload = JSON.parse(raw.toString('utf8')) as { data?: { id?: string | number; tx_ref?: string } };
-  const transactionId = payload.data?.id;
+  const payload = JSON.parse(raw.toString('utf8')) as unknown;
+  if (isRefundWebhookPayload(payload)) {
+    const originalTransactionId = getRefundTransactionId(payload);
+    if (!originalTransactionId) {
+      return sendError(res, 400, 'MISSING_REFUND_TRANSACTION', 'The Flutterwave refund webhook did not include the original transaction ID.');
+    }
+    const verifiedRefund = await verifyFlutterwaveRefund(originalTransactionId);
+    if (isCompletedRefundStatus(verifiedRefund.status)) {
+      await revokeVerifiedRefund(originalTransactionId, verifiedRefund);
+    }
+    return res.status(200).json({ received: true });
+  }
+
+  const data = payload && typeof payload === 'object' && 'data' in payload && payload.data && typeof payload.data === 'object'
+    ? payload.data as { id?: string | number; tx_ref?: string }
+    : {};
+  const transactionId = data.id;
   if (!transactionId) {
     return sendError(res, 400, 'MISSING_TRANSACTION', 'The Flutterwave webhook did not include a transaction ID.');
   }
 
   const verifiedTransaction = await verifyFlutterwaveTransaction(String(transactionId));
+  if (isTerminalChargeFailure(verifiedTransaction.status)) {
+    await recordVerifiedTerminalFailure(verifiedTransaction);
+    return res.status(200).json({ received: true });
+  }
   await fulfillVerifiedTransaction(verifiedTransaction);
   return res.status(200).json({ received: true });
 }));
