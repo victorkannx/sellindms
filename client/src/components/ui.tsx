@@ -1,5 +1,5 @@
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import type { FormEvent, ReactNode } from 'react';
 import type { Script } from '../types/domain';
 
 export const Brand = ({ inverted = false }: { inverted?: boolean }) => (
@@ -61,16 +61,56 @@ export const EmptyState = ({ title, children, action }: { title: string; childre
 
 export const LoadingState = ({ label = 'Loading' }: { label?: string }) => <div className="loading-state"><span className="spinner" />{label}</div>;
 
-const navItems = [
-  ['/', 'Home'],
-  ['/app/start-here', 'Start'],
+const mobileNavItems = [
+  ['/app', 'Home'],
+  ['/app/start-here', 'Start Here'],
   ['/app/search', 'Search'],
+  ['/app/scripts', 'Browse Library'],
   ['/app/saved', 'Saved'],
-  ['/app/scripts', 'Library'],
+  ['/app/recent', 'Recent'],
+  ['/app/resources', 'Resources'],
   ['/app/account', 'Account'],
 ] as const;
 
-export const MobileNav = () => <nav className="mobile-nav" aria-label="Mobile navigation">{navItems.map(([to, label]) => <NavLink key={to} to={to} end={to === '/'}>{label}</NavLink>)}</nav>;
+export const MobileNav = () => {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const closeMenu = () => {
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
+
+  return (
+    <div className="mobile-nav">
+      <header className="mobile-app-header">
+        <Brand />
+        <button ref={triggerRef} className={`mobile-menu-toggle ${open ? 'is-open' : ''}`} type="button" aria-label={open ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={open} aria-controls="mobile-customer-menu" onClick={() => open ? closeMenu() : setOpen(true)}>
+          <span /><span /><span />
+        </button>
+      </header>
+      {open && <div className="mobile-menu-layer" onClick={closeMenu}>
+        <aside id="mobile-customer-menu" className="mobile-menu" role="dialog" aria-modal="true" aria-label="Customer navigation" onClick={(event) => event.stopPropagation()}>
+          <div className="mobile-menu__top"><span>MENU</span><button ref={closeRef} type="button" className="mobile-menu__close" aria-label="Close navigation menu" onClick={closeMenu}>×</button></div>
+          <nav>
+            {mobileNavItems.map(([to, label]) => <NavLink key={to} to={to} end={to === '/app'} onClick={closeMenu}>{label}<span aria-hidden="true">→</span></NavLink>)}
+          </nav>
+          <p>Find the next move. Keep the conversation clear.</p>
+        </aside>
+      </div>}
+    </div>
+  );
+};
 
 export const AppSidebar = ({ onSignOut }: { onSignOut: () => void }) => (
   <aside className="app-sidebar">
