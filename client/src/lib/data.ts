@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { Entitlement, Product, Resource, Script, Taxonomy } from '../types/domain';
+import type { Entitlement, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
 
 const scriptFields = `
   id, script_code, slug, title, situation, they_said, bad_reply, better_reply,
@@ -145,6 +145,14 @@ export const getRelatedScripts = async (supabase: SupabaseClient, scriptId: stri
   return ids.map((id) => keyed.get(id)).filter((item): item is Script => Boolean(item));
 };
 
+export const getScriptsByIds = async (supabase: SupabaseClient, ids: string[]) => {
+  if (!ids.length) return [];
+  const { data, error } = await supabase.from('scripts').select(scriptFields).in('id', ids).eq('status', 'published');
+  if (error) throw error;
+  const keyed = new Map((data ?? []).map((item) => [item.id, normalizeScript(item)]));
+  return ids.map((id) => keyed.get(id)).filter((item): item is Script => Boolean(item));
+};
+
 export const getSavedScripts = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase
     .from('favorites')
@@ -205,19 +213,41 @@ export const recordCopied = async (supabase: SupabaseClient, user: User, scriptI
 };
 
 export const getResources = async (supabase: SupabaseClient): Promise<Resource[]> => {
-  const { data, error } = await supabase
-    .from('resources')
-    .select('id, slug, title, description, resource_type, external_url, storage_path')
-    .eq('is_active', true)
-    .order('sort_order');
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    resourceType: row.resource_type,
-    externalUrl: row.external_url,
-    storagePath: row.storage_path,
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.access_token) throw new Error('Sign in again to access resources.');
+  const response = await fetch('/api/resources', { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message || 'Resources could not load.');
+  return (payload as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id),
+    slug: String(row.slug),
+    title: String(row.title),
+    description: typeof row.description === 'string' ? row.description : null,
+    resourceType: String(row.resource_type),
+    externalUrl: typeof row.external_url === 'string' ? row.external_url : null,
+    storagePath: typeof row.storage_path === 'string' ? row.storage_path : null,
+    hasContent: row.has_content === true,
   }));
+};
+
+export const getResourceGuide = async (supabase: SupabaseClient, slug: string): Promise<{ resource: Resource; guide: ResourceGuide }> => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.access_token) throw new Error('Sign in again to access this resource.');
+  const response = await fetch(`/api/resources/${encodeURIComponent(slug)}/content`, { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message || 'This resource could not load.');
+  const row = payload.resource as Record<string, unknown>;
+  return {
+    resource: {
+      id: String(row.id),
+      slug: String(row.slug),
+      title: String(row.title),
+      description: typeof row.description === 'string' ? row.description : null,
+      resourceType: String(row.resource_type),
+      externalUrl: typeof row.external_url === 'string' ? row.external_url : null,
+      storagePath: typeof row.storage_path === 'string' ? row.storage_path : null,
+      hasContent: row.has_content === true,
+    },
+    guide: payload.guide as ResourceGuide,
+  };
 };

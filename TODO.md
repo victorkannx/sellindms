@@ -46,3 +46,21 @@
 - Keep primary interactions fast through server-side queries, indexed existing search infrastructure, efficient joins, lazy secondary content, and pagination; do not load all scripts client-side merely to search.
 - Validate landing/checkout product display, protected routes, entitlement persistence after refresh, live search for “stopped replying”, “how much”, and “expensive”, actual script rendering, copy action, favorites, recently viewed, published/archive filtering, responsive navigation/search/detail/checkout/authentication states, and absence of private credentials from browser output.
 - Resolve TypeScript and build diagnostics, provide server health endpoint and Docker production contract, preserve truthful no-fake-data behavior, and report any non-configurable Supabase RLS or missing payment credential blocker precisely.
+
+## 8. Start Here onboarding
+
+- Add a customer-facing Start Here onboarding page inside the entitlement-gated `/app/*` experience without changing Supabase Auth, payment, entitlement, RLS, product content, or the existing 100 script records.
+- Explain the exact 3-step workflow: **Find the situation → Use the response → Keep moving**.
+- Include links to the existing search experience and relevant existing scripts, using live script slugs/IDs and not duplicating or rewriting script bodies.
+- Preserve the existing Sell In DMs visual design system, navigation, and mobile-first behavior.
+
+## 9. Customer resources
+
+- Populate the existing `resources` table with exactly four useful active resources named **Sell In DMs Quick Reference**, **DM Conversation Map**, **Objection Handling Cheat Sheet**, and **What Do I Say? Decision Guide**; do not create a new table or duplicate/rewrite the 100 scripts.
+- Make the Resources page display the four resources instead of an empty state and make each resource usable from a customer-facing mobile-first experience.
+- Make resource listing and resource content accessible only to authenticated customers with an active Sell In DMs Core entitlement, without modifying RLS policies or weakening existing access checks.
+- Keep resource records tied to the existing resources schema and existing access model; do not change payment, pricing, Flutterwave, Supabase Auth, product access, or product content logic.
+
+## 10. Validation and preservation
+
+- Validate Start Here rendering, the exact 3-step workflow, search links, existing script links, all four resource records and resource views, mobile layout, entitlement protection, existing search/library behavior, and absence of changes to the 100 script records, payment/auth/RLS logic, and product content.

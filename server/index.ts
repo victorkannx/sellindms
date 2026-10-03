@@ -5,6 +5,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { createServer as createViteServer } from 'vite';
 import { publicSupabaseConfig, requireConfig, runtimeConfig, safeAppOrigin } from './lib/config.js';
 import { authenticatedUser, getAdminClient, isActiveAccess } from './lib/supabase.js';
+import { getResourceGuide } from './services/resources.js';
 import {
   createPaymentReference,
   fulfillVerifiedTransaction,
@@ -55,6 +56,16 @@ const accessForUser = async (userId: string) => {
     .maybeSingle();
   if (error) throw error;
   return { product, access: data };
+};
+
+const activeCustomer = async (authorization: string | undefined, res: Response) => {
+  const user = await authenticatedUser(authorization);
+  const { access } = await accessForUser(user.id);
+  if (!isActiveAccess(access)) {
+    sendError(res, 403, 'ACCESS_REQUIRED', 'An active Sell In DMs Core entitlement is required to access resources.');
+    return null;
+  }
+  return user;
 };
 
 const toPaymentStatusPath = (verified: boolean, reference?: string) => {
@@ -132,6 +143,35 @@ app.post('/api/payments/flutterwave/webhook', express.raw({ type: 'application/j
 }));
 
 app.use(express.json({ limit: '100kb' }));
+
+app.get('/api/resources', asyncRoute(async (req, res) => {
+  if (!await activeCustomer(req.header('authorization'), res)) return;
+  const { data, error } = await getAdminClient()
+    .from('resources')
+    .select('id, slug, title, description, resource_type, external_url, storage_path')
+    .eq('is_active', true)
+    .order('sort_order');
+  if (error) throw error;
+  return res.json((data ?? []).map((resource) => ({ ...resource, has_content: Boolean(getResourceGuide(resource.slug)) })));
+}));
+
+app.get('/api/resources/:slug/content', asyncRoute(async (req, res) => {
+  if (!await activeCustomer(req.header('authorization'), res)) return;
+  const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+  const { data: resource, error } = await getAdminClient()
+    .from('resources')
+    .select('id, slug, title, description, resource_type, external_url, storage_path')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (error) throw error;
+  const guide = getResourceGuide(slug);
+  if (!resource || !guide) return sendError(res, 404, 'RESOURCE_NOT_FOUND', 'This active resource could not be found.');
+  return res.json({
+    resource: { ...resource, has_content: true },
+    guide,
+  });
+}));
 
 app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   const user = await authenticatedUser(req.header('authorization'));

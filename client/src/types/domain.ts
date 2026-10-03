@@ -42,6 +42,21 @@ export type Resource = {
   resourceType: string;
   externalUrl: string | null;
   storagePath: string | null;
+  hasContent: boolean;
+};
+
+export type ResourceGuide = {
+  eyebrow: string;
+  intro: string;
+  sections: Array<{
+    title: string;
+    copy: string;
+    bullets?: string[];
+  }>;
+  searchPrompts: Array<{
+    label: string;
+    query: string;
+  }>;
 };
 
 export type Entitlement = {

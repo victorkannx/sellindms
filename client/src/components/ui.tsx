@@ -63,6 +63,7 @@ export const LoadingState = ({ label = 'Loading' }: { label?: string }) => <div 
 
 const navItems = [
   ['/', 'Home'],
+  ['/app/start-here', 'Start'],
   ['/app/search', 'Search'],
   ['/app/saved', 'Saved'],
   ['/app/scripts', 'Library'],
@@ -76,6 +77,7 @@ export const AppSidebar = ({ onSignOut }: { onSignOut: () => void }) => (
     <Brand />
     <nav className="sidebar-nav" aria-label="Customer navigation">
       <NavLink to="/app" end>Dashboard</NavLink>
+      <NavLink to="/app/start-here">Start here</NavLink>
       <NavLink to="/app/search">Search</NavLink>
       <NavLink to="/app/scripts">Browse library</NavLink>
       <NavLink to="/app/saved">Saved</NavLink>

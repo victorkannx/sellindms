@@ -208,6 +208,17 @@ h1 em, h2 em { color: var(--accent); font-style: normal; }
 .page-header { max-width: 790px; margin-bottom: 29px; }
 .page-header h1 { max-width: 760px; margin: 12px 0; font: 500 clamp(38px, 4vw, 58px)/.98 'DM Sans', sans-serif; letter-spacing: -.075em; }
 .page-header > p { max-width: 570px; margin: 0; color: var(--slate); font-size: 14px; line-height: 1.7; }
+.start-prompt { display: flex; justify-content: space-between; gap: 22px; align-items: center; max-width: 790px; margin: -7px 0 29px; padding: 17px 18px; border: 1px solid var(--line); background: #f4f1ea; }
+.start-prompt div { display: grid; gap: 5px; }
+.start-prompt span { color: var(--accent-deep); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.start-prompt strong { font: 500 16px/1.15 'DM Sans', sans-serif; letter-spacing: -.03em; }
+.start-steps { display: grid; gap: 1px; max-width: 860px; border: 1px solid var(--line); background: var(--line); }
+.start-steps article { display: grid; grid-template-columns: 72px 1fr; gap: 23px; padding: 26px; background: var(--white); }
+.start-steps article > span { color: var(--accent-deep); font-size: 10px; font-weight: 700; }
+.start-steps small { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.start-steps h2 { margin: 8px 0; font: 500 clamp(25px, 3vw, 34px)/1 'DM Sans', sans-serif; letter-spacing: -.06em; }
+.start-steps p { max-width: 530px; margin: 0 0 15px; color: var(--slate); font-size: 13px; line-height: 1.7; }
+.start-steps .text-link { color: var(--accent-deep); font-size: 11px; font-weight: 700; }
 .search-form { display: flex; align-items: center; width: 100%; max-width: 800px; min-height: 65px; padding: 7px 8px 7px 21px; border: 1px solid var(--ink); background: var(--white); box-shadow: 7px 8px 0 #d9d3c7; }
 .search-form__icon { margin-right: 13px; color: var(--accent-deep); font: 28px/1 Georgia, serif; }
 .search-form input { flex: 1; min-width: 0; border: 0; outline: none; color: var(--ink); font: 500 15px/1 'DM Sans', sans-serif; letter-spacing: -.015em; }
@@ -306,6 +317,20 @@ h1 em, h2 em { color: var(--accent); font-style: normal; }
 .resource-list h2 { margin: 6px 0; font: 500 23px/1 'DM Sans', sans-serif; letter-spacing: -.055em; }
 .resource-list p { margin: 0; color: var(--slate); font-size: 11px; line-height: 1.6; }
 .unavailable { color: var(--muted); font-size: 10px; }
+.guide-detail { max-width: 880px; }
+.guide-panels { display: grid; gap: 10px; }
+.guide-panel { display: grid; grid-template-columns: 48px 1fr; gap: 17px; padding: 24px; border: 1px solid var(--line); background: var(--white); }
+.guide-panel > span { color: var(--accent-deep); font-size: 10px; font-weight: 700; }
+.guide-panel h2 { margin: 0 0 10px; font: 500 24px/1.05 'DM Sans', sans-serif; letter-spacing: -.055em; }
+.guide-panel p { max-width: 680px; margin: 0; color: var(--slate); font-size: 13px; line-height: 1.7; }
+.guide-panel ul { display: grid; gap: 7px; margin: 17px 0 0; padding-left: 18px; color: #504d46; font-size: 12px; line-height: 1.6; }
+.guide-actions { display: grid; grid-template-columns: .9fr 1.1fr; gap: 35px; margin-top: 43px; padding: 27px; border: 1px solid var(--ink); background: var(--ink); color: var(--white); }
+.guide-actions .eyebrow { color: var(--accent); }
+.guide-actions h2 { max-width: 380px; margin: 9px 0 0; font: 500 27px/1.02 'DM Sans', sans-serif; letter-spacing: -.06em; }
+.guide-actions > div:last-child { display: grid; align-content: start; border-top: 1px solid #55534d; }
+.guide-actions a { display: flex; justify-content: space-between; gap: 10px; padding: 13px 0; border-bottom: 1px solid #55534d; color: #efebe2; font-size: 12px; }
+.guide-actions a:hover { color: var(--accent); }
+.guide-actions b { color: var(--accent); font-weight: 400; }
 .account-card { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border: 1px solid var(--line); background: var(--line); }
 .account-card > div { min-height: 126px; padding: 22px; background: var(--white); }
 .account-card span { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
@@ -362,7 +387,7 @@ h1 em, h2 em { color: var(--accent); font-style: normal; }
   .customer-app { padding-bottom: 66px; }
   .app-sidebar { display: none; }
   .app-canvas { width: 100%; margin: 0; padding: 36px 16px 45px; }
-  .mobile-nav { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 61px; border-top: 1px solid var(--line); background: rgba(251,250,247,.96); backdrop-filter: blur(12px); }
+  .mobile-nav { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(6, 1fr); min-height: 61px; border-top: 1px solid var(--line); background: rgba(251,250,247,.96); backdrop-filter: blur(12px); }
   .mobile-nav a { display: grid; place-items: center; color: var(--muted); font-size: 9px; font-weight: 700; }
   .mobile-nav a.active { color: var(--accent-deep); }
   .page-header h1 { font-size: 41px; }
@@ -372,6 +397,9 @@ h1 em, h2 em { color: var(--accent); font-style: normal; }
   .search-examples { gap: 6px; }
   .quick-help { grid-template-columns: 1fr; }
   .script-grid, .script-grid--search { grid-template-columns: 1fr; }
+  .start-prompt { align-items: start; flex-direction: column; }
+  .start-steps article { grid-template-columns: 34px 1fr; gap: 13px; padding: 21px; }
+  .start-steps h2 { font-size: 27px; }
   .script-card { min-height: 180px; }
   .browse-rail { grid-template-columns: 1fr; gap: 15px; }
   .detail-header { display: grid; }
@@ -384,6 +412,10 @@ h1 em, h2 em { color: var(--accent); font-style: normal; }
   .detail-notes { grid-template-columns: 1fr; }
   .resource-list article { grid-template-columns: 26px 1fr; }
   .resource-list article > div:last-child { grid-column: 2; }
+  .guide-panel { grid-template-columns: 29px 1fr; gap: 11px; padding: 20px; }
+  .guide-panel h2 { font-size: 22px; }
+  .guide-actions { grid-template-columns: 1fr; gap: 24px; padding: 22px; }
+  .guide-actions h2 { font-size: 25px; }
   .account-card { grid-template-columns: 1fr; }
   .account-card > div { min-height: 90px; }
 }
