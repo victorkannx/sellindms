@@ -40,10 +40,12 @@ export const ScriptCard = ({ script, saved, onSave }: { script: Script; saved?: 
       {onSave && <button className={`icon-button ${saved ? 'is-saved' : ''}`} onClick={() => onSave(script)} aria-label={saved ? `Remove ${script.title} from saved scripts` : `Save ${script.title}`}>{saved ? '★' : '☆'}</button>}
     </div>
     <Link to={`/app/scripts/${script.slug}`} className="script-card__link">
-      <h3>{script.title}</h3>
-      <p>{script.situation}</p>
+      <div className="script-card__body">
+        <h3>{script.title}</h3>
+        <p>{script.situation}</p>
+      </div>
       <div className="script-card__footer">
-        <span>{script.niches.slice(0, 2).map((niche) => niche.name).join(' · ') || 'All niches'}</span>
+        <span>{script.niches.map((niche) => niche.name).join(' · ') || 'All niches'}</span>
         <span className="arrow-link">Open <b>→</b></span>
       </div>
     </Link>

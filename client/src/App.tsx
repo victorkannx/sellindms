@@ -134,16 +134,27 @@ function App() {
   ), [supabase, user, entitlement, refreshEntitlement]);
 
   return (
-    <Routes>
-      <Route path="/" element={<Landing configurationError={configurationError} />} />
-      <Route path="/checkout" element={<Checkout supabase={supabase} user={user} entitlement={entitlement} accessLoading={accessLoading} configurationError={configurationError} refreshEntitlement={refreshEntitlement} />} />
-      <Route path="/payment/success" element={<PaymentResult supabase={supabase} user={user} successful />} />
-      <Route path="/payment/failed" element={<PaymentResult supabase={supabase} user={user} successful={false} />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/app/*" element={<CustomerGate loading={loading} accessLoading={accessLoading} user={user} entitlement={entitlement} configurationError={configurationError} customerValue={customerValue} />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<Landing configurationError={configurationError} />} />
+        <Route path="/checkout" element={<Checkout supabase={supabase} user={user} entitlement={entitlement} accessLoading={accessLoading} configurationError={configurationError} refreshEntitlement={refreshEntitlement} />} />
+        <Route path="/payment/success" element={<PaymentResult supabase={supabase} user={user} successful />} />
+        <Route path="/payment/failed" element={<PaymentResult supabase={supabase} user={user} successful={false} />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/app/*" element={<CustomerGate loading={loading} accessLoading={accessLoading} user={user} entitlement={entitlement} configurationError={configurationError} customerValue={customerValue} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
+}
+
+function ScrollToTop() {
+  const location = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname, location.search]);
+  return null;
 }
 
 function Landing({ configurationError }: { configurationError: string | null }) {
