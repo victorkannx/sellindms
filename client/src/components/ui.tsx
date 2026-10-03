@@ -44,8 +44,8 @@ export const ScriptCard = ({ script, saved, onSave }: { script: Script; saved?: 
         <h3>{script.title}</h3>
         <p>{script.situation}</p>
       </div>
+      <span className="script-card__niches">{script.niches.map((niche) => niche.name).join(' · ') || 'All niches'}</span>
       <div className="script-card__footer">
-        <span>{script.niches.map((niche) => niche.name).join(' · ') || 'All niches'}</span>
         <span className="arrow-link">Open <b>→</b></span>
       </div>
     </Link>
