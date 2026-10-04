@@ -67,6 +67,7 @@ const mobileNavItems = [
   ['/app', 'Home'],
   ['/app/start-here', 'Start Here'],
   ['/app/sales-context', 'AI Sales Context'],
+  ['/app/ai-reply', 'AI Reply'],
   ['/app/search', 'Search'],
   ['/app/scripts', 'Browse Library'],
   ['/app/saved', 'Saved'],
@@ -122,6 +123,7 @@ export const AppSidebar = ({ onSignOut }: { onSignOut: () => void }) => (
       <NavLink to="/app" end>Dashboard</NavLink>
       <NavLink to="/app/start-here">Start here</NavLink>
       <NavLink to="/app/sales-context">AI Sales Context</NavLink>
+      <NavLink to="/app/ai-reply">AI Reply</NavLink>
       <NavLink to="/app/search">Search</NavLink>
       <NavLink to="/app/scripts">Browse library</NavLink>
       <NavLink to="/app/saved">Saved</NavLink>

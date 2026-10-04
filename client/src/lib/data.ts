@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
+import type { AiReplySession, AiReplySessionInput, BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
 
 const scriptFields = `
   id, script_code, slug, title, situation, they_said, bad_reply, better_reply,
@@ -13,6 +13,7 @@ const getErrorMessage = (error: unknown) => error instanceof Error ? error.messa
 
 const businessContextFields = 'id, user_id, business_name, description, target_customer, differentiator, business_information, policies, created_at, updated_at';
 const offerFields = 'id, user_id, name, description, price, currency, included_items, benefits, delivery_information, terms, policies, is_active, created_at, updated_at';
+const aiReplySessionFields = 'id, user_id, customer_message, conversation_context, business_context_id, offer_id, recommended_script_id, generated_reply, next_move, created_at';
 const optionalText = (value: string) => value.trim() || null;
 
 const normalizeBusinessContext = (row: Record<string, any>): BusinessContext => ({
@@ -43,6 +44,19 @@ const normalizeOffer = (row: Record<string, any>): Offer => ({
   isActive: Boolean(row.is_active),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+});
+
+const normalizeAiReplySession = (row: Record<string, any>): AiReplySession => ({
+  id: row.id,
+  userId: row.user_id,
+  customerMessage: row.customer_message,
+  conversationContext: row.conversation_context ?? null,
+  businessContextId: row.business_context_id ?? null,
+  offerId: row.offer_id ?? null,
+  recommendedScriptId: row.recommended_script_id ?? null,
+  generatedReply: row.generated_reply ?? null,
+  nextMove: row.next_move ?? null,
+  createdAt: row.created_at,
 });
 
 const taxonomyFrom = (row: Record<string, unknown> | null | undefined): Taxonomy | null => {
@@ -328,6 +342,17 @@ export const getOffers = async (supabase: SupabaseClient, user: User): Promise<O
   return (data ?? []).map(normalizeOffer);
 };
 
+export const getActiveOffer = async (supabase: SupabaseClient, user: User): Promise<Offer | null> => {
+  const { data, error } = await supabase
+    .from('offers')
+    .select(offerFields)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? normalizeOffer(data) : null;
+};
+
 export const saveOffer = async (supabase: SupabaseClient, user: User, input: OfferInput, knownId?: string, currentIsActive = false): Promise<Offer> => {
   const payload = {
     name: input.name.trim(),
@@ -361,4 +386,34 @@ export const setOfferActive = async (supabase: SupabaseClient, user: User, offer
 export const deleteOffer = async (supabase: SupabaseClient, user: User, offerId: string): Promise<void> => {
   const { error } = await supabase.from('offers').delete().eq('id', offerId).eq('user_id', user.id);
   if (error) throw error;
+};
+
+export const getRecentAiReplySessions = async (supabase: SupabaseClient, user: User, limit = 6): Promise<AiReplySession[]> => {
+  const { data, error } = await supabase
+    .from('ai_reply_sessions')
+    .select(aiReplySessionFields)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(normalizeAiReplySession);
+};
+
+export const createAiReplySession = async (supabase: SupabaseClient, user: User, input: AiReplySessionInput): Promise<AiReplySession> => {
+  const customerMessage = input.customerMessage.trim();
+  if (!customerMessage) throw new Error('Paste the customer’s latest message before continuing.');
+
+  const { data, error } = await supabase
+    .from('ai_reply_sessions')
+    .insert({
+      user_id: user.id,
+      customer_message: customerMessage,
+      conversation_context: optionalText(input.conversationContext),
+      business_context_id: input.businessContextId,
+      offer_id: input.offerId,
+    })
+    .select(aiReplySessionFields)
+    .single();
+  if (error || !data) throw error || new Error('Your conversation could not be prepared.');
+  return normalizeAiReplySession(data);
 };

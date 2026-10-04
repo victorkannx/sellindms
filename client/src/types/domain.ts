@@ -124,3 +124,23 @@ export type OfferInput = {
   policies: string;
   isActive: boolean;
 };
+
+export type AiReplySession = {
+  id: string;
+  userId: string;
+  customerMessage: string;
+  conversationContext: string | null;
+  businessContextId: string | null;
+  offerId: string | null;
+  recommendedScriptId: string | null;
+  generatedReply: string | null;
+  nextMove: string | null;
+  createdAt: string;
+};
+
+export type AiReplySessionInput = {
+  customerMessage: string;
+  conversationContext: string;
+  businessContextId: string | null;
+  offerId: string | null;
+};

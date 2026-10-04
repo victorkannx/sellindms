@@ -3,12 +3,15 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppSidebar, Brand, Chip, EmptyState, formatNaira, LoadingState, MobileNav, ScriptCard, SearchForm } from './components/ui';
 import {
+  createAiReplySession,
   deleteOffer,
   getBusinessContext,
   getEntitlement,
   getFavoriteIds,
+  getActiveOffer,
   getOffers,
   getPublicProduct,
+  getRecentAiReplySessions,
   getRecentlyViewed,
   getRelatedScripts,
   getResourceGuide,
@@ -27,7 +30,7 @@ import {
   trackScriptView,
 } from './lib/data';
 import { getAuthCallbackUrl, getSupabase } from './lib/supabase';
-import type { BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, PaymentStatus, Product, Resource, ResourceGuide, Script, Taxonomy } from './types/domain';
+import type { AiReplySession, BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, PaymentStatus, Product, Resource, ResourceGuide, Script, Taxonomy } from './types/domain';
 
 type CustomerContextValue = {
   supabase: SupabaseClient;
@@ -381,7 +384,7 @@ function CustomerArea() {
   const { supabase } = useCustomer();
   const navigate = useNavigate();
   const signOut = async () => { await supabase.auth.signOut(); navigate('/'); };
-  return <div className="customer-app"><AppSidebar onSignOut={() => void signOut()} /><main className="app-canvas"><Routes><Route index element={<Dashboard />} /><Route path="start-here" element={<StartHerePage />} /><Route path="sales-context" element={<SalesContextPage />} /><Route path="search" element={<SearchPage />} /><Route path="scripts" element={<LibraryPage />} /><Route path="scripts/:slug" element={<ScriptDetailPage />} /><Route path="category/:slug" element={<BrowsePage kind="category" />} /><Route path="stage/:slug" element={<BrowsePage kind="stage" />} /><Route path="niche/:slug" element={<BrowsePage kind="niche" />} /><Route path="saved" element={<SavedPage />} /><Route path="recent" element={<RecentPage />} /><Route path="resources" element={<ResourcesPage />} /><Route path="resources/:slug" element={<ResourceGuidePage />} /><Route path="account" element={<AccountPage onSignOut={signOut} />} /><Route path="*" element={<Navigate to="/app" replace />} /></Routes></main><MobileNav /></div>;
+  return <div className="customer-app"><AppSidebar onSignOut={() => void signOut()} /><main className="app-canvas"><Routes><Route index element={<Dashboard />} /><Route path="start-here" element={<StartHerePage />} /><Route path="sales-context" element={<SalesContextPage />} /><Route path="ai-reply" element={<AiReplyPage />} /><Route path="search" element={<SearchPage />} /><Route path="scripts" element={<LibraryPage />} /><Route path="scripts/:slug" element={<ScriptDetailPage />} /><Route path="category/:slug" element={<BrowsePage kind="category" />} /><Route path="stage/:slug" element={<BrowsePage kind="stage" />} /><Route path="niche/:slug" element={<BrowsePage kind="niche" />} /><Route path="saved" element={<SavedPage />} /><Route path="recent" element={<RecentPage />} /><Route path="resources" element={<ResourcesPage />} /><Route path="resources/:slug" element={<ResourceGuidePage />} /><Route path="account" element={<AccountPage onSignOut={signOut} />} /><Route path="*" element={<Navigate to="/app" replace />} /></Routes></main><MobileNav /></div>;
 }
 
 function PageHeader({ eyebrow, title, copy, children }: { eyebrow?: string; title: ReactNode; copy?: string; children?: ReactNode }) { return <header className="page-header">{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1>{copy && <p>{copy}</p>}{children}</header>; }
@@ -393,6 +396,16 @@ const emptyBusinessContextForm = (): BusinessContextForm => ({ businessName: '',
 const emptyOfferForm = (): OfferForm => ({ name: '', description: '', price: '', currency: 'NGN', includedItems: '', benefits: '', deliveryInformation: '', terms: '', policies: '', isActive: false });
 const businessContextToForm = (context: BusinessContext): BusinessContextForm => ({ businessName: context.businessName, description: context.description || '', targetCustomer: context.targetCustomer || '', differentiator: context.differentiator || '', businessInformation: context.businessInformation || '', policies: context.policies || '' });
 const offerToForm = (offer: Offer): OfferForm => ({ name: offer.name, description: offer.description || '', price: offer.price === null ? '' : String(offer.price), currency: offer.currency || 'NGN', includedItems: offer.includedItems || '', benefits: offer.benefits || '', deliveryInformation: offer.deliveryInformation || '', terms: offer.terms || '', policies: offer.policies || '', isActive: offer.isActive });
+const formatOfferPrice = (offer: Offer) => {
+  if (offer.price === null) return null;
+  try {
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: offer.currency || 'NGN', maximumFractionDigits: 2 }).format(offer.price);
+  } catch {
+    return `${offer.currency || 'NGN'} ${offer.price}`;
+  }
+};
+const formatSessionTimestamp = (value: string) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+const sessionPreview = (message: string) => message.length > 130 ? `${message.slice(0, 127).trimEnd()}…` : message;
 
 function SalesContextPage() {
   const { supabase, user } = useCustomer();
@@ -590,6 +603,121 @@ function SalesContextPage() {
         <div className="context-form__actions"><button className="button button--accent" type="submit" disabled={savingOffer}>{savingOffer ? 'Saving offer…' : editingOfferId ? 'Save Offer' : 'Add Offer'} <span>→</span></button><button className="button button--outline" type="button" onClick={cancelOffer}>Cancel</button></div>
       </form>}
       {loading ? <LoadingState label="Loading offers" /> : offers.length ? <div className="offer-list">{offers.map((offer) => <article key={offer.id} className="offer-card"><div className="offer-card__heading"><div><div className="offer-card__meta"><span className={`offer-status ${offer.isActive ? 'is-active' : ''}`}>{offer.isActive ? 'Active' : 'Inactive'}</span>{displayPrice(offer) && <strong>{displayPrice(offer)}</strong>}</div><h3>{offer.name}</h3>{offer.description && <p>{offer.description}</p>}</div></div><div className="offer-card__actions"><button className="button button--outline button--small" type="button" onClick={() => beginOffer(offer)}>Edit</button><button className="button button--outline button--small" type="button" disabled={offerActionId === offer.id} onClick={() => void changeOfferActiveState(offer)}>{offerActionId === offer.id ? 'Saving…' : offer.isActive ? 'Deactivate' : 'Set Active'}</button><button className="offer-delete" type="button" disabled={offerActionId === offer.id} onClick={() => void removeOffer(offer)}>Delete</button></div></article>)}</div> : !offerEditorOpen && <EmptyState title="No offers yet" action={<button className="button button--accent" type="button" onClick={() => beginOffer()}>Add Your First Offer <span>→</span></button>}>Add the product or service you usually sell in conversations.</EmptyState>}
+    </section>
+  </div>;
+}
+
+function AiReplyPage() {
+  const { supabase, user } = useCustomer();
+  const [businessContext, setBusinessContext] = useState<BusinessContext | null>(null);
+  const [activeOffer, setActiveOffer] = useState<Offer | null>(null);
+  const [sessions, setSessions] = useState<AiReplySession[] | null>(null);
+  const [customerMessage, setCustomerMessage] = useState('');
+  const [conversationContext, setConversationContext] = useState('');
+  const [mode, setMode] = useState<'quick' | 'full'>('quick');
+  const [activeSession, setActiveSession] = useState<AiReplySession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [savedContext, savedOffer, recentSessions] = await Promise.all([
+        getBusinessContext(supabase, user),
+        getActiveOffer(supabase, user),
+        getRecentAiReplySessions(supabase, user),
+      ]);
+      setBusinessContext(savedContext);
+      setActiveOffer(savedOffer);
+      setSessions(recentSessions);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Your AI reply workspace could not load.');
+      setSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, user]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!customerMessage.trim()) {
+      setError('Paste the customer’s latest message before continuing.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const saved = await createAiReplySession(supabase, user, {
+        customerMessage,
+        conversationContext,
+        businessContextId: businessContext?.id || null,
+        offerId: activeOffer?.id || null,
+      });
+      setCustomerMessage(saved.customerMessage);
+      setConversationContext(saved.conversationContext || '');
+      setActiveSession(saved);
+      setSessions((current) => [saved, ...(current || []).filter((session) => session.id !== saved.id)].slice(0, 6));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Your conversation could not be prepared.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const reopenSession = (session: AiReplySession) => {
+    setCustomerMessage(session.customerMessage);
+    setConversationContext(session.conversationContext || '');
+    setActiveSession(session);
+    setError(null);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  };
+
+  const capturedBusiness = activeSession?.businessContextId
+    ? businessContext?.id === activeSession.businessContextId ? businessContext.businessName : 'Saved business context selected'
+    : 'No business context selected';
+  const capturedOffer = activeSession?.offerId
+    ? activeOffer?.id === activeSession.offerId ? activeOffer.name : 'Saved offer selected'
+    : 'No active offer selected';
+
+  return <div className="ai-reply-page">
+    <PageHeader eyebrow="AI REPLY" title={<>What did they <em>say?</em></>} copy="Paste the customer’s latest message. We’ll use your business, offer, and Sell In DMs frameworks to help you decide what to say next." />
+
+    <section className="ai-reply-workbench">
+      <div className="ai-reply-mode" aria-label="Reply mode">
+        <button className={mode === 'quick' ? 'is-active' : ''} type="button" aria-pressed={mode === 'quick'} onClick={() => setMode('quick')}><span>01</span><strong>Quick Reply</strong><small>Start with the message in front of you.</small></button>
+        <button className={mode === 'full' ? 'is-active' : ''} type="button" aria-pressed={mode === 'full'} onClick={() => setMode('full')}><span>02</span><strong>Full Context</strong><small>Make your saved business and offer context explicit.</small></button>
+      </div>
+      <p className="ai-reply-mode__note">{mode === 'full' ? 'Full Context will include your saved business and active offer alongside this conversation.' : 'Quick Reply uses your latest message first, with saved context when it is available.'}</p>
+
+      <form className="ai-reply-form" onSubmit={submit}>
+        <label className="ai-reply-field ai-reply-field--message">Customer’s message<textarea required value={customerMessage} onChange={(event) => setCustomerMessage(event.target.value)} placeholder="Paste the customer’s latest message here..." /></label>
+        <label className="ai-reply-field">What happened before this?<textarea value={conversationContext} onChange={(event) => setConversationContext(event.target.value)} placeholder="Give us a little context about the conversation..." /></label>
+        <p className="ai-reply-field__help">Optional, but useful when the message depends on what happened earlier.</p>
+
+        <section className="ai-reply-context" aria-label="Saved context selection">
+          <div className="ai-reply-context__heading"><div><span className="eyebrow">SAVED CONTEXT</span><h2>What we’ll keep in view.</h2></div><Link className="text-link" to="/app/sales-context">Edit context <span>→</span></Link></div>
+          {loading ? <LoadingState label="Loading your business and offer" /> : <div className="ai-reply-context__grid">
+            <div className="ai-reply-context__item"><span>BUSINESS</span>{businessContext ? <strong>{businessContext.businessName}</strong> : <div className="ai-reply-setup"><b>Your business context isn’t set up yet</b><Link to="/app/sales-context">Set up business context <span>→</span></Link></div>}</div>
+            <div className="ai-reply-context__item"><span>ACTIVE OFFER</span>{activeOffer ? <strong>{activeOffer.name}{formatOfferPrice(activeOffer) && <small> · {formatOfferPrice(activeOffer)}</small>}</strong> : <div className="ai-reply-setup"><b>Add an active offer to get more relevant replies.</b><Link to="/app/sales-context">Manage offers <span>→</span></Link></div>}</div>
+          </div>}
+        </section>
+
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <div className="ai-reply-form__actions"><button className="button button--accent" type="submit" disabled={loading || submitting || !customerMessage.trim()}>{submitting ? 'Preparing your conversation…' : loading ? 'Loading your context…' : 'Improve my reply'} <span>→</span></button><p>Phase 3 prepares the conversation. It does not generate a response yet.</p></div>
+      </form>
+    </section>
+
+    <section className="ai-reply-result" aria-live="polite">
+      <div className="ai-reply-result__heading"><div><span className="eyebrow">REPLY PREVIEW</span><h2>Your suggested reply</h2></div><span className="ai-reply-result__status">{activeSession ? 'Preparing for Phase 4' : 'Waiting for a conversation'}</span></div>
+      {!activeSession ? <div className="ai-reply-result__empty"><span>↳</span><div><strong>Bring the real message here.</strong><p>When you prepare a conversation, this space will hold the context and framework slots needed for the next phase—without pretending a reply has been generated.</p></div></div> : <div className="ai-reply-result__ready"><div><span className="eyebrow">SESSION READY</span><h3>Your conversation is ready.</h3><p>The AI reply engine will use your saved business context, active offer, conversation context, and the relevant Sell In DMs framework to craft the response.</p></div><dl className="ai-reply-slots"><div><dt>Saved business</dt><dd>{capturedBusiness}</dd></div><div><dt>Active offer</dt><dd>{capturedOffer}</dd></div><div><dt>Relevant framework</dt><dd>Selected when the AI reply engine is available.</dd></div></dl><div className="ai-reply-result__controls"><button className="button button--outline" type="button" disabled>Copy response</button><button className="button button--outline" type="button" disabled>Why this works</button><button className="button button--outline" type="button" disabled>Next move</button></div></div>}
+    </section>
+
+    <section className="ai-reply-history">
+      <div className="section-heading"><div><span className="eyebrow">RECENT REPLIES</span><h2>Return to a real conversation.</h2></div></div>
+      {sessions === null ? <LoadingState label="Loading recent replies" /> : sessions.length ? <div className="ai-reply-history__list">{sessions.map((session) => <button key={session.id} className={`ai-reply-history__item ${activeSession?.id === session.id ? 'is-active' : ''}`} type="button" onClick={() => reopenSession(session)}><div><span>{formatSessionTimestamp(session.createdAt)}</span><strong>{sessionPreview(session.customerMessage)}</strong></div><small>{session.generatedReply && session.nextMove ? 'AI reply available' : 'Waiting for AI reply'} <b>→</b></small></button>)}</div> : <EmptyState title="No conversations prepared yet.">The customer messages you prepare for AI will appear here.</EmptyState>}
     </section>
   </div>;
 }
