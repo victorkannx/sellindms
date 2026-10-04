@@ -58,6 +58,8 @@ pnpm build
 
 When neither configured provider is present, the endpoint returns a truthful `503 AI_PROVIDER_NOT_CONFIGURED` response; it never returns fabricated reply content.
 
+Provider output is treated as untrusted: the server rejects malformed or incomplete JSON, non-empty/length/schema violations, hidden/internal or credential-like content, contradictory claims, ungrounded sensitive business claims, and recommended script codes outside the server-retrieved published scripts. Customer and conversation text are passed as untrusted situation context, not instructions. On generation or validation failure, no reply is persisted or shown as if it were generated.
+
 ## Payment flow
 
 1. The customer signs in using Supabase Auth; this links a pending order to an authenticated identity but does not grant library access.
