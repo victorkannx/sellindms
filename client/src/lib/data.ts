@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { AiReplySession, AiReplySessionInput, BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
+import type { AiReplySession, BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
 
 const scriptFields = `
   id, script_code, slug, title, situation, they_said, bad_reply, better_reply,
@@ -399,21 +399,35 @@ export const getRecentAiReplySessions = async (supabase: SupabaseClient, user: U
   return (data ?? []).map(normalizeAiReplySession);
 };
 
-export const createAiReplySession = async (supabase: SupabaseClient, user: User, input: AiReplySessionInput): Promise<AiReplySession> => {
+export const generateAiReply = async (
+  supabase: SupabaseClient,
+  input: { customerMessage: string; conversationContext: string; mode: 'quick' | 'full' },
+): Promise<{ session: AiReplySession; whyThisWorks: string; recommendedScriptCode: string | null }> => {
   const customerMessage = input.customerMessage.trim();
   if (!customerMessage) throw new Error('Paste the customer’s latest message before continuing.');
 
-  const { data, error } = await supabase
-    .from('ai_reply_sessions')
-    .insert({
-      user_id: user.id,
-      customer_message: customerMessage,
-      conversation_context: optionalText(input.conversationContext),
-      business_context_id: input.businessContextId,
-      offer_id: input.offerId,
-    })
-    .select(aiReplySessionFields)
-    .single();
-  if (error || !data) throw error || new Error('Your conversation could not be prepared.');
-  return normalizeAiReplySession(data);
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.access_token) throw new Error('Sign in again before generating a reply.');
+
+  const response = await fetch('/api/ai-replies', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sessionData.session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customerMessage,
+      conversationContext: optionalText(input.conversationContext),
+      mode: input.mode,
+    }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message || 'We could not generate a reply just now.');
+  if (!payload?.session) throw new Error('The generated reply could not be loaded.');
+
+  return {
+    session: normalizeAiReplySession(payload.session),
+    whyThisWorks: typeof payload.whyThisWorks === 'string' ? payload.whyThisWorks : '',
+    recommendedScriptCode: typeof payload.recommendedScriptCode === 'string' ? payload.recommendedScriptCode : null,
+  };
 };

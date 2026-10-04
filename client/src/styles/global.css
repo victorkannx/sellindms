@@ -1009,6 +1009,7 @@ button, input { font-weight: 500; }
 .ai-reply-result__empty p { max-width: 680px; margin: 8px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.7; }
 .ai-reply-result__ready { padding: clamp(24px, 4vw, 38px); background: var(--ink); color: var(--white); box-shadow: 6px 7px 0 var(--accent); }
 .ai-reply-result__ready h3 { margin: 10px 0 0; font-size: clamp(28px, 3vw, 38px); font-weight: 700; line-height: 1.1; letter-spacing: -.055em; }
+.ai-reply-result__ready .ai-reply-result__reply { white-space: pre-wrap; font-size: clamp(22px, 2.35vw, 30px); line-height: 1.42; letter-spacing: -.035em; }
 .ai-reply-result__ready > div > p { max-width: 720px; margin: 18px 0 0; color: #d4d0c7; font-size: 15px; line-height: 1.75; }
 .ai-reply-result__ready .eyebrow { color: var(--accent); }
 .ai-reply-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: var(--space-5) 0 0; border: 1px solid #5a5851; background: #5a5851; }
@@ -1017,6 +1018,9 @@ button, input { font-weight: 500; }
 .ai-reply-slots dd { margin: 11px 0 0; color: #f2eee5; font-size: 13px; font-weight: 600; line-height: 1.55; overflow-wrap: anywhere; }
 .ai-reply-result__controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--space-5); }
 .ai-reply-result__controls .button { border-color: #706d65; color: #d3cfc7; background: transparent; }
+.ai-reply-result__controls .button.is-active { border-color: var(--accent); color: var(--ink); background: var(--accent); }
+.ai-reply-result__detail { max-width: 760px; margin-top: var(--space-5); padding: 18px 20px; border-left: 2px solid var(--accent); background: #282723; }
+.ai-reply-result__detail p { margin: 10px 0 0; color: #f2eee5; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
 .ai-reply-history { margin-top: var(--space-8); padding-top: var(--space-5); border-top: 1px solid var(--line); }
 .ai-reply-history__list { display: grid; border-top: 1px solid var(--line); }
 .ai-reply-history__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; padding: 20px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text-primary); text-align: left; }
@@ -1050,6 +1054,7 @@ button, input { font-weight: 500; }
   .ai-reply-result__empty > span { font-size: 25px; }
   .ai-reply-result__ready { padding: 26px 20px; box-shadow: 4px 5px 0 var(--accent); }
   .ai-reply-result__ready h3 { font-size: 29px; }
+  .ai-reply-result__ready .ai-reply-result__reply { font-size: 22px; }
   .ai-reply-result__ready > div > p { font-size: 14px; }
   .ai-reply-slots { grid-template-columns: 1fr; margin-top: var(--space-4); }
   .ai-reply-slots > div { min-height: 0; padding: 16px; }

@@ -3,8 +3,8 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppSidebar, Brand, Chip, EmptyState, formatNaira, LoadingState, MobileNav, ScriptCard, SearchForm } from './components/ui';
 import {
-  createAiReplySession,
   deleteOffer,
+  generateAiReply,
   getBusinessContext,
   getEntitlement,
   getFavoriteIds,
@@ -619,6 +619,10 @@ function AiReplyPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [whyThisWorks, setWhyThisWorks] = useState<string | null>(null);
+  const [recommendedScriptCode, setRecommendedScriptCode] = useState<string | null>(null);
+  const [resultDetail, setResultDetail] = useState<'why' | 'next' | null>(null);
+  const [copiedReply, setCopiedReply] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -643,25 +647,33 @@ function AiReplyPage() {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     if (!customerMessage.trim()) {
       setError('Paste the customer’s latest message before continuing.');
       return;
     }
     setSubmitting(true);
     setError(null);
+    setActiveSession(null);
+    setWhyThisWorks(null);
+    setRecommendedScriptCode(null);
+    setResultDetail(null);
+    setCopiedReply(false);
     try {
-      const saved = await createAiReplySession(supabase, user, {
+      const generated = await generateAiReply(supabase, {
         customerMessage,
         conversationContext,
-        businessContextId: businessContext?.id || null,
-        offerId: activeOffer?.id || null,
+        mode,
       });
-      setCustomerMessage(saved.customerMessage);
-      setConversationContext(saved.conversationContext || '');
-      setActiveSession(saved);
-      setSessions((current) => [saved, ...(current || []).filter((session) => session.id !== saved.id)].slice(0, 6));
+      setCustomerMessage(generated.session.customerMessage);
+      setConversationContext(generated.session.conversationContext || '');
+      setActiveSession(generated.session);
+      setWhyThisWorks(generated.whyThisWorks || null);
+      setRecommendedScriptCode(generated.recommendedScriptCode);
+      setSessions((current) => [generated.session, ...(current || []).filter((session) => session.id !== generated.session.id)].slice(0, 6));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Your conversation could not be prepared.');
+      setError(reason instanceof Error ? reason.message : 'We could not generate a reply just now.');
+      void refresh();
     } finally {
       setSubmitting(false);
     }
@@ -671,8 +683,23 @@ function AiReplyPage() {
     setCustomerMessage(session.customerMessage);
     setConversationContext(session.conversationContext || '');
     setActiveSession(session);
+    setWhyThisWorks(null);
+    setRecommendedScriptCode(null);
+    setResultDetail(null);
+    setCopiedReply(false);
     setError(null);
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  };
+
+  const copyReply = async () => {
+    if (!activeSession?.generatedReply) return;
+    try {
+      await navigator.clipboard.writeText(activeSession.generatedReply);
+      setCopiedReply(true);
+      window.setTimeout(() => setCopiedReply(false), 2_200);
+    } catch {
+      setError('Copy failed. Select the reply text and copy it manually.');
+    }
   };
 
   const capturedBusiness = activeSession?.businessContextId
@@ -681,6 +708,10 @@ function AiReplyPage() {
   const capturedOffer = activeSession?.offerId
     ? activeOffer?.id === activeSession.offerId ? activeOffer.name : 'Saved offer selected'
     : 'No active offer selected';
+  const hasGeneratedReply = Boolean(activeSession?.generatedReply && activeSession.nextMove);
+  const detailCopy = resultDetail === 'why'
+    ? whyThisWorks || 'Why this works was not retained for this earlier saved reply.'
+    : activeSession?.nextMove || '';
 
   return <div className="ai-reply-page">
     <PageHeader eyebrow="AI REPLY" title={<>What did they <em>say?</em></>} copy="Paste the customer’s latest message. We’ll use your business, offer, and Sell In DMs frameworks to help you decide what to say next." />
@@ -706,13 +737,13 @@ function AiReplyPage() {
         </section>
 
         {error && <div className="form-error" role="alert">{error}</div>}
-        <div className="ai-reply-form__actions"><button className="button button--accent" type="submit" disabled={loading || submitting || !customerMessage.trim()}>{submitting ? 'Preparing your conversation…' : loading ? 'Loading your context…' : 'Improve my reply'} <span>→</span></button><p>Phase 3 prepares the conversation. It does not generate a response yet.</p></div>
+        <div className="ai-reply-form__actions"><button className="button button--accent" type="submit" disabled={loading || submitting || !customerMessage.trim()}>{submitting ? 'Writing your reply…' : loading ? 'Loading your context…' : 'Improve my reply'} <span>→</span></button><p>Replies use your saved facts, current conversation, and the relevant Sell In DMs framework. Missing details are never guessed.</p></div>
       </form>
     </section>
 
     <section className="ai-reply-result" aria-live="polite">
-      <div className="ai-reply-result__heading"><div><span className="eyebrow">REPLY PREVIEW</span><h2>Your suggested reply</h2></div><span className="ai-reply-result__status">{activeSession ? 'Preparing for Phase 4' : 'Waiting for a conversation'}</span></div>
-      {!activeSession ? <div className="ai-reply-result__empty"><span>↳</span><div><strong>Bring the real message here.</strong><p>When you prepare a conversation, this space will hold the context and framework slots needed for the next phase—without pretending a reply has been generated.</p></div></div> : <div className="ai-reply-result__ready"><div><span className="eyebrow">SESSION READY</span><h3>Your conversation is ready.</h3><p>The AI reply engine will use your saved business context, active offer, conversation context, and the relevant Sell In DMs framework to craft the response.</p></div><dl className="ai-reply-slots"><div><dt>Saved business</dt><dd>{capturedBusiness}</dd></div><div><dt>Active offer</dt><dd>{capturedOffer}</dd></div><div><dt>Relevant framework</dt><dd>Selected when the AI reply engine is available.</dd></div></dl><div className="ai-reply-result__controls"><button className="button button--outline" type="button" disabled>Copy response</button><button className="button button--outline" type="button" disabled>Why this works</button><button className="button button--outline" type="button" disabled>Next move</button></div></div>}
+      <div className="ai-reply-result__heading"><div><span className="eyebrow">REPLY PREVIEW</span><h2>Your suggested reply</h2></div><span className="ai-reply-result__status">{submitting ? 'Generating a reply' : hasGeneratedReply ? 'AI reply available' : activeSession ? 'Waiting for AI reply' : 'Waiting for a conversation'}</span></div>
+      {!activeSession ? <div className="ai-reply-result__empty"><span>↳</span><div><strong>{submitting ? 'Writing a careful reply.' : error ? 'No reply was generated.' : 'Bring the real message here.'}</strong><p>{submitting ? 'Your business facts, conversation context, and relevant Sell In DMs scripts are being considered now.' : error ? 'Your message was saved only if the server reached that step. Fix the issue above, then try again—no placeholder reply is shown.' : 'When you improve a conversation, this space will hold a real suggested response—never a fabricated preview.'}</p></div></div> : !hasGeneratedReply ? <div className="ai-reply-result__empty"><span>…</span><div><strong>This conversation is still waiting for an AI reply.</strong><p>No response has been generated yet. You can submit the message again when the AI service is available.</p></div></div> : <div className="ai-reply-result__ready"><div><span className="eyebrow">SUGGESTED REPLY</span><h3 className="ai-reply-result__reply">{activeSession.generatedReply}</h3><p>This reply was created from the current conversation, the saved facts available at the time, and relevant Sell In DMs guidance.</p></div><dl className="ai-reply-slots"><div><dt>Saved business</dt><dd>{capturedBusiness}</dd></div><div><dt>Active offer</dt><dd>{capturedOffer}</dd></div><div><dt>Relevant framework</dt><dd>{recommendedScriptCode || (activeSession.recommendedScriptId ? 'A saved framework was used.' : 'No single framework recommended.')}</dd></div></dl><div className="ai-reply-result__controls"><button className="button button--outline" type="button" onClick={() => void copyReply()}>{copiedReply ? 'Copied' : 'Copy response'}</button><button className={`button button--outline ${resultDetail === 'why' ? 'is-active' : ''}`} type="button" aria-pressed={resultDetail === 'why'} onClick={() => setResultDetail((current) => current === 'why' ? null : 'why')}>Why this works</button><button className={`button button--outline ${resultDetail === 'next' ? 'is-active' : ''}`} type="button" aria-pressed={resultDetail === 'next'} onClick={() => setResultDetail((current) => current === 'next' ? null : 'next')}>Next move</button></div>{resultDetail && <div className="ai-reply-result__detail"><span className="eyebrow">{resultDetail === 'why' ? 'WHY THIS WORKS' : 'NEXT MOVE'}</span><p>{detailCopy}</p></div>}</div>}
     </section>
 
     <section className="ai-reply-history">

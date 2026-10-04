@@ -5,6 +5,15 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { createServer as createViteServer } from 'vite';
 import { publicSupabaseConfig, requireConfig, runtimeConfig, safeAppOrigin } from './lib/config.js';
 import { authenticatedUser, getAdminClient, isActiveAccess } from './lib/supabase.js';
+import {
+  AiReplyConfigurationError,
+  AiReplyOutputError,
+  AiReplyProviderError,
+  generateAiReply,
+  type AiReplyBusinessContext,
+  type AiReplyOffer,
+  type AiReplyScript,
+} from './services/ai-reply.js';
 import { getResourceGuide } from './services/resources.js';
 import {
   createPaymentReference,
@@ -32,6 +41,146 @@ const sendError = (res: Response, status: number, code: string, message: string,
 
 const asyncRoute = (handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) =>
   (req: Request, res: Response, next: NextFunction) => void handler(req, res, next).catch(next);
+
+const aiReplySessionFields = 'id, user_id, customer_message, conversation_context, business_context_id, offer_id, recommended_script_id, generated_reply, next_move, created_at';
+const aiReplyScriptFields = 'id, script_code, title, situation, they_said, better_reply, why_it_works, alternative_response, next_move, use_this_when, categories(name), stages(name)';
+const inFlightAiReplyUsers = new Set<string>();
+
+class AiReplyInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AiReplyInputError';
+  }
+}
+
+type AiReplyRequestInput = {
+  customerMessage: string;
+  conversationContext: string | null;
+  mode: 'quick' | 'full';
+};
+
+const asOptionalText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
+
+const readAiReplyInput = (body: unknown): AiReplyRequestInput => {
+  const request = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+  const customerMessage = asOptionalText(request.customerMessage);
+  const conversationContext = asOptionalText(request.conversationContext);
+  const mode = request.mode === 'full' ? 'full' : 'quick';
+
+  if (!customerMessage) throw new AiReplyInputError('Paste the customer’s latest message before continuing.');
+  if (customerMessage.length > 20_000 || (conversationContext?.length || 0) > 20_000) {
+    throw new AiReplyInputError('Keep each conversation field under 20,000 characters.');
+  }
+
+  return { customerMessage, conversationContext, mode };
+};
+
+const relationName = (value: unknown) => {
+  const record = Array.isArray(value) ? value[0] : value;
+  return record && typeof record === 'object' && 'name' in record && typeof record.name === 'string' ? record.name : null;
+};
+
+const toAiReplyScript = (row: Record<string, any>): AiReplyScript => ({
+  id: String(row.id),
+  scriptCode: String(row.script_code),
+  title: String(row.title),
+  situation: typeof row.situation === 'string' ? row.situation : null,
+  theySaid: typeof row.they_said === 'string' ? row.they_said : null,
+  betterReply: typeof row.better_reply === 'string' ? row.better_reply : null,
+  whyItWorks: typeof row.why_it_works === 'string' ? row.why_it_works : null,
+  alternativeResponse: typeof row.alternative_response === 'string' ? row.alternative_response : null,
+  nextMove: typeof row.next_move === 'string' ? row.next_move : null,
+  useThisWhen: typeof row.use_this_when === 'string' ? row.use_this_when : null,
+  category: relationName(row.categories),
+  stage: relationName(row.stages),
+});
+
+const retrieveAiReplyScripts = async (customerMessage: string, conversationContext: string | null): Promise<AiReplyScript[]> => {
+  const admin = getAdminClient();
+  const combinedQuery = [customerMessage, conversationContext].filter(Boolean).join('\n');
+  const findIds = async (queryText: string) => {
+    const { data: matches, error: searchError } = await admin.rpc('search_scripts', {
+      query_text: queryText,
+      result_limit: 5,
+    });
+    if (searchError) throw searchError;
+    const result: string[] = [];
+    for (const match of (matches ?? []) as unknown[]) {
+      const record = match && typeof match === 'object' ? match as Record<string, unknown> : null;
+      if (typeof record?.id === 'string') result.push(record.id);
+    }
+    return result;
+  };
+
+  const ids = await findIds(combinedQuery);
+  if (ids.length < 3 && conversationContext?.trim()) {
+    for (const id of await findIds(customerMessage)) {
+      if (!ids.includes(id)) ids.push(id);
+      if (ids.length === 5) break;
+    }
+  }
+  if (!ids.length) return [];
+
+  const { data, error } = await admin
+    .from('scripts')
+    .select(aiReplyScriptFields)
+    .in('id', ids)
+    .eq('status', 'published');
+  if (error) throw error;
+
+  const byId = new Map<string, AiReplyScript>((data ?? []).map((script: Record<string, any>) => [String(script.id), toAiReplyScript(script)]));
+  return ids.map((id: string) => byId.get(id)).filter((script: AiReplyScript | undefined): script is AiReplyScript => Boolean(script));
+};
+
+const aiReplyBusinessContext = (row: Record<string, any> | null | undefined): AiReplyBusinessContext | null => row ? {
+  id: String(row.id),
+  businessName: String(row.business_name),
+  description: typeof row.description === 'string' ? row.description : null,
+  targetCustomer: typeof row.target_customer === 'string' ? row.target_customer : null,
+  differentiator: typeof row.differentiator === 'string' ? row.differentiator : null,
+  businessInformation: typeof row.business_information === 'string' ? row.business_information : null,
+  policies: typeof row.policies === 'string' ? row.policies : null,
+} : null;
+
+const aiReplyOffer = (row: Record<string, any> | null | undefined): AiReplyOffer | null => row ? {
+  id: String(row.id),
+  name: String(row.name),
+  description: typeof row.description === 'string' ? row.description : null,
+  price: row.price === null || row.price === undefined ? null : Number(row.price),
+  currency: typeof row.currency === 'string' ? row.currency : null,
+  includedItems: typeof row.included_items === 'string' ? row.included_items : null,
+  benefits: typeof row.benefits === 'string' ? row.benefits : null,
+  deliveryInformation: typeof row.delivery_information === 'string' ? row.delivery_information : null,
+  terms: typeof row.terms === 'string' ? row.terms : null,
+  policies: typeof row.policies === 'string' ? row.policies : null,
+} : null;
+
+const aiReplySessionResponse = (row: Record<string, any>) => ({
+  id: String(row.id),
+  userId: String(row.user_id),
+  customerMessage: String(row.customer_message),
+  conversationContext: typeof row.conversation_context === 'string' ? row.conversation_context : null,
+  businessContextId: typeof row.business_context_id === 'string' ? row.business_context_id : null,
+  offerId: typeof row.offer_id === 'string' ? row.offer_id : null,
+  recommendedScriptId: typeof row.recommended_script_id === 'string' ? row.recommended_script_id : null,
+  generatedReply: typeof row.generated_reply === 'string' ? row.generated_reply : null,
+  nextMove: typeof row.next_move === 'string' ? row.next_move : null,
+  createdAt: String(row.created_at),
+});
+
+const isRecentMatchingAiReplySession = (
+  row: Record<string, any>,
+  input: AiReplyRequestInput,
+  businessContextId: string | null,
+  offerId: string | null,
+) => {
+  const createdAt = typeof row.created_at === 'string' ? new Date(row.created_at).getTime() : Number.NaN;
+  const withinRetryWindow = Number.isFinite(createdAt) && Date.now() - createdAt < 5 * 60_000;
+  return withinRetryWindow
+    && row.conversation_context === input.conversationContext
+    && row.business_context_id === businessContextId
+    && row.offer_id === offerId;
+};
 
 const getCoreProduct = async (): Promise<ProductRecord> => {
   const { data, error } = await getAdminClient()
@@ -173,6 +322,113 @@ app.get('/api/resources/:slug/content', asyncRoute(async (req, res) => {
   });
 }));
 
+app.post('/api/ai-replies', asyncRoute(async (req, res) => {
+  const user = await activeCustomer(req.header('authorization'), res);
+  if (!user) return;
+  const input = readAiReplyInput(req.body);
+
+  if (inFlightAiReplyUsers.has(user.id)) {
+    return sendError(res, 409, 'AI_REPLY_IN_PROGRESS', 'Your reply is already being prepared. Please wait for it to finish.');
+  }
+
+  inFlightAiReplyUsers.add(user.id);
+  try {
+    const admin = getAdminClient();
+    const [contextResult, offerResult] = await Promise.all([
+      admin
+        .from('business_contexts')
+        .select('id, business_name, description, target_customer, differentiator, business_information, policies')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1),
+      admin
+        .from('offers')
+        .select('id, name, description, price, currency, included_items, benefits, delivery_information, terms, policies')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle(),
+    ]);
+    if (contextResult.error) throw contextResult.error;
+    if (offerResult.error) throw offerResult.error;
+
+    const businessContext = aiReplyBusinessContext(contextResult.data?.[0]);
+    const activeOffer = aiReplyOffer(offerResult.data);
+    const { data: recentSessions, error: recentSessionsError } = await admin
+      .from('ai_reply_sessions')
+      .select(aiReplySessionFields)
+      .eq('user_id', user.id)
+      .eq('customer_message', input.customerMessage)
+      .order('created_at', { ascending: false })
+      .limit(8);
+    if (recentSessionsError) throw recentSessionsError;
+
+    const matchingSession = (recentSessions ?? []).find((session: Record<string, any>) => isRecentMatchingAiReplySession(
+      session,
+      input,
+      businessContext?.id || null,
+      activeOffer?.id || null,
+    ));
+    if (matchingSession?.generated_reply && matchingSession.next_move) {
+      return res.status(200).json({
+        session: aiReplySessionResponse(matchingSession),
+        whyThisWorks: null,
+        recommendedScriptCode: null,
+        reused: true,
+      });
+    }
+
+    let createdSession = matchingSession;
+    if (!createdSession) {
+      const { data, error: createError } = await admin
+      .from('ai_reply_sessions')
+      .insert({
+        user_id: user.id,
+        customer_message: input.customerMessage,
+        conversation_context: input.conversationContext,
+        business_context_id: businessContext?.id || null,
+        offer_id: activeOffer?.id || null,
+      })
+      .select(aiReplySessionFields)
+      .single();
+      if (createError || !data) throw createError || new Error('Your conversation could not be prepared.');
+      createdSession = data;
+    }
+
+    const scripts = await retrieveAiReplyScripts(input.customerMessage, input.conversationContext);
+    const generated = await generateAiReply({
+      customerMessage: input.customerMessage,
+      conversationContext: input.conversationContext,
+      mode: input.mode,
+      businessContext,
+      activeOffer,
+      scripts,
+    });
+    const recommendedScriptId = generated.recommendedScriptCode
+      ? scripts.find((script) => script.scriptCode === generated.recommendedScriptCode)?.id || null
+      : null;
+    const { data: completedSession, error: completionError } = await admin
+      .from('ai_reply_sessions')
+      .update({
+        generated_reply: generated.reply,
+        next_move: generated.nextMove,
+        recommended_script_id: recommendedScriptId,
+      })
+      .eq('id', createdSession.id)
+      .eq('user_id', user.id)
+      .select(aiReplySessionFields)
+      .single();
+    if (completionError || !completedSession) throw completionError || new Error('The generated reply could not be saved.');
+
+    return res.status(201).json({
+      session: aiReplySessionResponse(completedSession),
+      whyThisWorks: generated.whyThisWorks,
+      recommendedScriptCode: generated.recommendedScriptCode,
+    });
+  } finally {
+    inFlightAiReplyUsers.delete(user.id);
+  }
+}));
+
 app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   const user = await authenticatedUser(req.header('authorization'));
   if (!user.email) {
@@ -299,6 +555,17 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
   if (message === 'AUTH_REQUIRED') {
     return sendError(res, 401, 'AUTH_REQUIRED', 'Sign in to continue.');
+  }
+  if (error instanceof AiReplyInputError) {
+    return sendError(res, 400, 'AI_REPLY_INPUT_INVALID', error.message);
+  }
+  if (error instanceof AiReplyConfigurationError) {
+    return sendError(res, 503, 'AI_PROVIDER_NOT_CONFIGURED', 'AI replies are not configured yet. Please try again later.', {
+      required: ['OPENAI_API_KEY or BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY'],
+    });
+  }
+  if (error instanceof AiReplyProviderError || error instanceof AiReplyOutputError) {
+    return sendError(res, 502, 'AI_GENERATION_FAILED', 'We could not generate a reply just now. Your conversation was saved, so please try again.');
   }
   if (message.startsWith('Configuration is missing:')) {
     const key = message.split(': ')[1];

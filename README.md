@@ -10,6 +10,7 @@ A mobile-first customer application for the existing **Sell In DMs Core** Supaba
 - Requires both a Supabase Auth session and active `product_access` entitlement before `/app/*` can display the paid library.
 - Uses the existing `search_scripts(query_text, result_limit)` full-text function for natural-language search.
 - Keeps Flutterwave secrets server-only. Checkout success URLs do not grant access; the server verifies Flutterwave transactions before changing an order to `successful` and upserting the unique `(user_id, product_id)` access row.
+- Generates AI replies only from the authenticated customer’s saved business context, owned active offer, current conversation, and 3–5 results from the existing script search; it never accepts browser-supplied user or context IDs.
 
 ## Required configuration
 
@@ -20,6 +21,10 @@ Use the secure project secret input flow for these values; do not put them in so
 | `SUPABASE_URL` | Server and browser-safe runtime configuration |
 | `SUPABASE_ANON_KEY` | Browser-safe Supabase Auth and RLS client configuration |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only product lookup, pending order persistence, verified fulfillment, and signed resource links |
+| `OPENAI_API_KEY` | Preferred server-only OpenAI credential for AI Reply generation |
+| `OPENAI_API_BASE` | Optional OpenAI-compatible base URL for AI Reply generation |
+| `BUILT_IN_FORGE_API_URL` / `BUILT_IN_FORGE_API_KEY` | Alternative Manus server-side AI provider pair |
+| `AI_REPLY_MODEL` | Optional server-side AI Reply model override; defaults to `gpt-5-mini` |
 | `FLUTTERWAVE_SECRET_KEY` | Server-only Flutterwave checkout initialization and transaction verification |
 | `FLUTTERWAVE_WEBHOOK_SECRET` | Server-only validation of the Flutterwave `verif-hash` webhook header |
 | `APP_ORIGIN` | Browser-visible HTTPS origin used for the Supabase Auth callback and Flutterwave callback URL |
@@ -46,6 +51,12 @@ The app listens on port `3000`. Health check: `GET /_app/health`.
 pnpm typecheck
 pnpm build
 ```
+
+## AI Reply flow
+
+`POST /api/ai-replies` is entitlement-gated and requires a bearer Supabase session. The server loads the authenticated user’s current business context and active offer, creates the input `ai_reply_sessions` row, searches the existing `search_scripts(query_text, result_limit)` function with the customer message plus conversation context, sends the returned script content to the configured server-side provider, validates the structured response, and finally updates the same owned session with `generated_reply`, `next_move`, and a verified recommended script ID. The browser never receives provider or Supabase service-role credentials.
+
+When neither configured provider is present, the endpoint returns a truthful `503 AI_PROVIDER_NOT_CONFIGURED` response; it never returns fabricated reply content.
 
 ## Payment flow
 
