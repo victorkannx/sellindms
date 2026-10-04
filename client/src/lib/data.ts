@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { Entitlement, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
+import type { BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
 
 const scriptFields = `
   id, script_code, slug, title, situation, they_said, bad_reply, better_reply,
@@ -10,6 +10,40 @@ const scriptFields = `
 `;
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'The request could not be completed.';
+
+const businessContextFields = 'id, user_id, business_name, description, target_customer, differentiator, business_information, policies, created_at, updated_at';
+const offerFields = 'id, user_id, name, description, price, currency, included_items, benefits, delivery_information, terms, policies, is_active, created_at, updated_at';
+const optionalText = (value: string) => value.trim() || null;
+
+const normalizeBusinessContext = (row: Record<string, any>): BusinessContext => ({
+  id: row.id,
+  userId: row.user_id,
+  businessName: row.business_name,
+  description: row.description ?? null,
+  targetCustomer: row.target_customer ?? null,
+  differentiator: row.differentiator ?? null,
+  businessInformation: row.business_information ?? null,
+  policies: row.policies ?? null,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const normalizeOffer = (row: Record<string, any>): Offer => ({
+  id: row.id,
+  userId: row.user_id,
+  name: row.name,
+  description: row.description ?? null,
+  price: row.price === null || row.price === undefined ? null : Number(row.price),
+  currency: row.currency,
+  includedItems: row.included_items ?? null,
+  benefits: row.benefits ?? null,
+  deliveryInformation: row.delivery_information ?? null,
+  terms: row.terms ?? null,
+  policies: row.policies ?? null,
+  isActive: Boolean(row.is_active),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
 const taxonomyFrom = (row: Record<string, unknown> | null | undefined): Taxonomy | null => {
   if (!row || typeof row.id !== 'string' || typeof row.name !== 'string' || typeof row.slug !== 'string') return null;
@@ -250,4 +284,81 @@ export const getResourceGuide = async (supabase: SupabaseClient, slug: string): 
     },
     guide: payload.guide as ResourceGuide,
   };
+};
+
+export const getBusinessContext = async (supabase: SupabaseClient, user: User): Promise<BusinessContext | null> => {
+  const { data, error } = await supabase
+    .from('business_contexts')
+    .select(businessContextFields)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (error) throw error;
+  return data?.[0] ? normalizeBusinessContext(data[0]) : null;
+};
+
+export const saveBusinessContext = async (supabase: SupabaseClient, user: User, input: BusinessContextInput, knownId?: string): Promise<BusinessContext> => {
+  const payload = {
+    business_name: input.businessName.trim(),
+    description: optionalText(input.description),
+    target_customer: optionalText(input.targetCustomer),
+    differentiator: optionalText(input.differentiator),
+    business_information: optionalText(input.businessInformation),
+    policies: optionalText(input.policies),
+  };
+
+  let contextId = knownId;
+  if (!contextId) contextId = (await getBusinessContext(supabase, user))?.id;
+
+  const response = contextId
+    ? await supabase.from('business_contexts').update(payload).eq('id', contextId).eq('user_id', user.id).select(businessContextFields).single()
+    : await supabase.from('business_contexts').insert({ ...payload, user_id: user.id }).select(businessContextFields).single();
+  if (response.error || !response.data) throw response.error || new Error('Business information could not be saved.');
+  return normalizeBusinessContext(response.data);
+};
+
+export const getOffers = async (supabase: SupabaseClient, user: User): Promise<Offer[]> => {
+  const { data, error } = await supabase
+    .from('offers')
+    .select(offerFields)
+    .eq('user_id', user.id)
+    .order('is_active', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(normalizeOffer);
+};
+
+export const saveOffer = async (supabase: SupabaseClient, user: User, input: OfferInput, knownId?: string, currentIsActive = false): Promise<Offer> => {
+  const payload = {
+    name: input.name.trim(),
+    description: optionalText(input.description),
+    price: input.price,
+    currency: input.currency.trim().toUpperCase() || 'NGN',
+    included_items: optionalText(input.includedItems),
+    benefits: optionalText(input.benefits),
+    delivery_information: optionalText(input.deliveryInformation),
+    terms: optionalText(input.terms),
+    policies: optionalText(input.policies),
+    // A newly selected active offer is activated in a separate safe transition below.
+    is_active: knownId && currentIsActive && input.isActive,
+  };
+  const response = knownId
+    ? await supabase.from('offers').update(payload).eq('id', knownId).eq('user_id', user.id).select(offerFields).single()
+    : await supabase.from('offers').insert({ ...payload, user_id: user.id, is_active: false }).select(offerFields).single();
+  if (response.error || !response.data) throw response.error || new Error('Offer could not be saved.');
+  return normalizeOffer(response.data);
+};
+
+export const setOfferActive = async (supabase: SupabaseClient, user: User, offerId: string, active: boolean): Promise<void> => {
+  if (active) {
+    const { error: deactivateError } = await supabase.from('offers').update({ is_active: false }).eq('user_id', user.id).eq('is_active', true);
+    if (deactivateError) throw deactivateError;
+  }
+  const { error } = await supabase.from('offers').update({ is_active: active }).eq('id', offerId).eq('user_id', user.id);
+  if (error) throw error;
+};
+
+export const deleteOffer = async (supabase: SupabaseClient, user: User, offerId: string): Promise<void> => {
+  const { error } = await supabase.from('offers').delete().eq('id', offerId).eq('user_id', user.id);
+  if (error) throw error;
 };

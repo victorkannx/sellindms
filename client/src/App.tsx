@@ -3,8 +3,11 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppSidebar, Brand, Chip, EmptyState, formatNaira, LoadingState, MobileNav, ScriptCard, SearchForm } from './components/ui';
 import {
+  deleteOffer,
+  getBusinessContext,
   getEntitlement,
   getFavoriteIds,
+  getOffers,
   getPublicProduct,
   getRecentlyViewed,
   getRelatedScripts,
@@ -16,12 +19,15 @@ import {
   getTaxonomy,
   listScripts,
   recordCopied,
+  saveBusinessContext,
+  saveOffer,
   searchScripts,
+  setOfferActive,
   toggleFavorite,
   trackScriptView,
 } from './lib/data';
 import { getAuthCallbackUrl, getSupabase } from './lib/supabase';
-import type { Entitlement, PaymentStatus, Product, Resource, ResourceGuide, Script, Taxonomy } from './types/domain';
+import type { BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, PaymentStatus, Product, Resource, ResourceGuide, Script, Taxonomy } from './types/domain';
 
 type CustomerContextValue = {
   supabase: SupabaseClient;
@@ -375,10 +381,218 @@ function CustomerArea() {
   const { supabase } = useCustomer();
   const navigate = useNavigate();
   const signOut = async () => { await supabase.auth.signOut(); navigate('/'); };
-  return <div className="customer-app"><AppSidebar onSignOut={() => void signOut()} /><main className="app-canvas"><Routes><Route index element={<Dashboard />} /><Route path="start-here" element={<StartHerePage />} /><Route path="search" element={<SearchPage />} /><Route path="scripts" element={<LibraryPage />} /><Route path="scripts/:slug" element={<ScriptDetailPage />} /><Route path="category/:slug" element={<BrowsePage kind="category" />} /><Route path="stage/:slug" element={<BrowsePage kind="stage" />} /><Route path="niche/:slug" element={<BrowsePage kind="niche" />} /><Route path="saved" element={<SavedPage />} /><Route path="recent" element={<RecentPage />} /><Route path="resources" element={<ResourcesPage />} /><Route path="resources/:slug" element={<ResourceGuidePage />} /><Route path="account" element={<AccountPage onSignOut={signOut} />} /><Route path="*" element={<Navigate to="/app" replace />} /></Routes></main><MobileNav /></div>;
+  return <div className="customer-app"><AppSidebar onSignOut={() => void signOut()} /><main className="app-canvas"><Routes><Route index element={<Dashboard />} /><Route path="start-here" element={<StartHerePage />} /><Route path="sales-context" element={<SalesContextPage />} /><Route path="search" element={<SearchPage />} /><Route path="scripts" element={<LibraryPage />} /><Route path="scripts/:slug" element={<ScriptDetailPage />} /><Route path="category/:slug" element={<BrowsePage kind="category" />} /><Route path="stage/:slug" element={<BrowsePage kind="stage" />} /><Route path="niche/:slug" element={<BrowsePage kind="niche" />} /><Route path="saved" element={<SavedPage />} /><Route path="recent" element={<RecentPage />} /><Route path="resources" element={<ResourcesPage />} /><Route path="resources/:slug" element={<ResourceGuidePage />} /><Route path="account" element={<AccountPage onSignOut={signOut} />} /><Route path="*" element={<Navigate to="/app" replace />} /></Routes></main><MobileNav /></div>;
 }
 
 function PageHeader({ eyebrow, title, copy, children }: { eyebrow?: string; title: ReactNode; copy?: string; children?: ReactNode }) { return <header className="page-header">{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1>{copy && <p>{copy}</p>}{children}</header>; }
+
+type BusinessContextForm = BusinessContextInput;
+type OfferForm = Omit<OfferInput, 'price'> & { price: string };
+
+const emptyBusinessContextForm = (): BusinessContextForm => ({ businessName: '', description: '', targetCustomer: '', differentiator: '', businessInformation: '', policies: '' });
+const emptyOfferForm = (): OfferForm => ({ name: '', description: '', price: '', currency: 'NGN', includedItems: '', benefits: '', deliveryInformation: '', terms: '', policies: '', isActive: false });
+const businessContextToForm = (context: BusinessContext): BusinessContextForm => ({ businessName: context.businessName, description: context.description || '', targetCustomer: context.targetCustomer || '', differentiator: context.differentiator || '', businessInformation: context.businessInformation || '', policies: context.policies || '' });
+const offerToForm = (offer: Offer): OfferForm => ({ name: offer.name, description: offer.description || '', price: offer.price === null ? '' : String(offer.price), currency: offer.currency || 'NGN', includedItems: offer.includedItems || '', benefits: offer.benefits || '', deliveryInformation: offer.deliveryInformation || '', terms: offer.terms || '', policies: offer.policies || '', isActive: offer.isActive });
+
+function SalesContextPage() {
+  const { supabase, user } = useCustomer();
+  const [context, setContext] = useState<BusinessContext | null>(null);
+  const [businessForm, setBusinessForm] = useState<BusinessContextForm>(emptyBusinessContextForm);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [offerForm, setOfferForm] = useState<OfferForm>(emptyOfferForm);
+  const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
+  const [offerEditorOpen, setOfferEditorOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [savingBusiness, setSavingBusiness] = useState(false);
+  const [savingOffer, setSavingOffer] = useState(false);
+  const [offerActionId, setOfferActionId] = useState<string | null>(null);
+  const [businessError, setBusinessError] = useState<string | null>(null);
+  const [businessSuccess, setBusinessSuccess] = useState<string | null>(null);
+  const [offerError, setOfferError] = useState<string | null>(null);
+  const [offerSuccess, setOfferSuccess] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [savedContext, savedOffers] = await Promise.all([getBusinessContext(supabase, user), getOffers(supabase, user)]);
+      setContext(savedContext);
+      setBusinessForm(savedContext ? businessContextToForm(savedContext) : emptyBusinessContextForm());
+      setOffers(savedOffers);
+    } catch (reason) {
+      setBusinessError(reason instanceof Error ? reason.message : 'Business information could not load.');
+      setOfferError(reason instanceof Error ? reason.message : 'Offers could not load.');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, user]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const activeOffer = offers.find((offer) => offer.isActive) || null;
+  const status = !context && !activeOffer
+    ? 'Not set up'
+    : context && !activeOffer
+      ? 'Business information saved'
+      : 'Ready for AI replies';
+
+  const saveBusiness = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusinessError(null);
+    setBusinessSuccess(null);
+    if (!businessForm.businessName.trim()) {
+      setBusinessError('Business name is required.');
+      return;
+    }
+    setSavingBusiness(true);
+    try {
+      const saved = await saveBusinessContext(supabase, user, businessForm, context?.id);
+      setContext(saved);
+      setBusinessForm(businessContextToForm(saved));
+      setBusinessSuccess('Business information saved.');
+    } catch (reason) {
+      setBusinessError(reason instanceof Error ? reason.message : 'Business information could not be saved.');
+    } finally {
+      setSavingBusiness(false);
+    }
+  };
+
+  const beginOffer = (offer?: Offer) => {
+    setOfferError(null);
+    setOfferSuccess(null);
+    setEditingOfferId(offer?.id || null);
+    setOfferForm(offer ? offerToForm(offer) : emptyOfferForm());
+    setOfferEditorOpen(true);
+  };
+
+  const cancelOffer = () => {
+    setEditingOfferId(null);
+    setOfferForm(emptyOfferForm());
+    setOfferError(null);
+    setOfferEditorOpen(false);
+  };
+
+  const saveCurrentOffer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOfferError(null);
+    setOfferSuccess(null);
+    if (!offerForm.name.trim()) {
+      setOfferError('Offer name is required.');
+      return;
+    }
+    const parsedPrice = offerForm.price.trim() === '' ? null : Number(offerForm.price);
+    if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+      setOfferError('Price must be zero or greater.');
+      return;
+    }
+    const existing = offers.find((offer) => offer.id === editingOfferId);
+    const input: OfferInput = { ...offerForm, price: parsedPrice };
+    setSavingOffer(true);
+    try {
+      const saved = await saveOffer(supabase, user, input, existing?.id, existing?.isActive || false);
+      if (input.isActive) await setOfferActive(supabase, user, saved.id, true);
+      await refresh();
+      setOfferSuccess(existing ? 'Offer updated.' : 'Offer added.');
+      setEditingOfferId(null);
+      setOfferForm(emptyOfferForm());
+      setOfferEditorOpen(false);
+    } catch (reason) {
+      setOfferError(reason instanceof Error ? reason.message : 'Offer could not be saved.');
+      await refresh().catch(() => undefined);
+    } finally {
+      setSavingOffer(false);
+    }
+  };
+
+  const changeOfferActiveState = async (offer: Offer) => {
+    setOfferError(null);
+    setOfferSuccess(null);
+    setOfferActionId(offer.id);
+    try {
+      await setOfferActive(supabase, user, offer.id, !offer.isActive);
+      await refresh();
+      setOfferSuccess(offer.isActive ? 'Offer deactivated.' : 'Active offer updated.');
+    } catch (reason) {
+      setOfferError(reason instanceof Error ? reason.message : 'Offer status could not be updated.');
+      await refresh().catch(() => undefined);
+    } finally {
+      setOfferActionId(null);
+    }
+  };
+
+  const removeOffer = async (offer: Offer) => {
+    if (!window.confirm(`Delete “${offer.name}”? This does not affect previous purchases, orders, or payment records.`)) return;
+    setOfferError(null);
+    setOfferSuccess(null);
+    setOfferActionId(offer.id);
+    try {
+      await deleteOffer(supabase, user, offer.id);
+      if (editingOfferId === offer.id) cancelOffer();
+      await refresh();
+      setOfferSuccess('Offer deleted.');
+    } catch (reason) {
+      setOfferError(reason instanceof Error ? reason.message : 'Offer could not be deleted.');
+    } finally {
+      setOfferActionId(null);
+    }
+  };
+
+  const displayPrice = (offer: Offer) => {
+    if (offer.price === null) return null;
+    try {
+      return new Intl.NumberFormat('en-NG', { style: 'currency', currency: offer.currency || 'NGN', maximumFractionDigits: 2 }).format(offer.price);
+    } catch {
+      return `${offer.currency || 'NGN'} ${offer.price}`;
+    }
+  };
+
+  return <div className="sales-context-page">
+    <PageHeader eyebrow="PRIVATE SETUP" title={<>AI Sales <em>Context</em></>} copy="Give Sell In DMs the context it needs to help you respond like you actually know your business." />
+    <p className="sales-context-page__supporting">Your business and offer information is saved securely and can be reused whenever you use the AI reply assistant.</p>
+
+    <section className="context-status" aria-live="polite">
+      <div><span className="eyebrow">CONTEXT STATUS</span><strong>{status}</strong></div>
+      <p>Informational only. No AI replies are generated on this page.</p>
+    </section>
+
+    <section className="context-panel">
+      <div className="context-panel__heading"><div><span className="eyebrow">YOUR BUSINESS</span><h2>Business Information</h2></div></div>
+      {!loading && !context && <div className="context-empty-hint"><strong>Tell us about your business</strong><p>The more useful context you give us, the more relevant your future AI replies can be.</p></div>}
+      {loading ? <LoadingState label="Loading your business information" /> : <form className="context-form" onSubmit={saveBusiness}>
+        <label className="context-field context-field--full">Business name *<input required value={businessForm.businessName} onChange={(event) => setBusinessForm((current) => ({ ...current, businessName: event.target.value }))} placeholder="Your business name" /></label>
+        <label className="context-field">What do you sell?<textarea value={businessForm.description} onChange={(event) => setBusinessForm((current) => ({ ...current, description: event.target.value }))} placeholder="Describe your product or service" /></label>
+        <label className="context-field">Who do you serve?<textarea value={businessForm.targetCustomer} onChange={(event) => setBusinessForm((current) => ({ ...current, targetCustomer: event.target.value }))} placeholder="Describe the people you serve" /></label>
+        <label className="context-field">What makes your offer different?<textarea value={businessForm.differentiator} onChange={(event) => setBusinessForm((current) => ({ ...current, differentiator: event.target.value }))} placeholder="Your differentiator or point of view" /></label>
+        <label className="context-field">Other important business information<textarea value={businessForm.businessInformation} onChange={(event) => setBusinessForm((current) => ({ ...current, businessInformation: event.target.value }))} placeholder="Anything else that makes a response more useful" /></label>
+        <label className="context-field context-field--full">Policies / things the AI should know<textarea value={businessForm.policies} onChange={(event) => setBusinessForm((current) => ({ ...current, policies: event.target.value }))} placeholder="Boundaries, promises, policies, or details to keep in mind" /></label>
+        {businessError && <div className="form-error context-field--full" role="alert">{businessError}</div>}
+        {businessSuccess && <div className="form-success context-field--full" role="status">{businessSuccess}</div>}
+        <div className="context-form__actions context-field--full"><button className="button button--accent" type="submit" disabled={savingBusiness}>{savingBusiness ? 'Saving business information…' : 'Save Business Information'} <span>→</span></button></div>
+      </form>}
+    </section>
+
+    <section className="context-panel context-panel--offers">
+      <div className="context-panel__heading"><div><span className="eyebrow">WHAT YOU SELL</span><h2>Offers</h2></div><button className="button button--outline" type="button" onClick={() => beginOffer()}>{offers.length ? 'Add Offer' : 'Add Your First Offer'} <span>+</span></button></div>
+      {offerError && <div className="form-error" role="alert">{offerError}</div>}
+      {offerSuccess && <div className="form-success" role="status">{offerSuccess}</div>}
+      {offerEditorOpen && <form className="offer-editor" onSubmit={saveCurrentOffer}>
+        <div className="offer-editor__heading"><div><span className="eyebrow">{editingOfferId ? 'EDIT OFFER' : 'NEW OFFER'}</span><h3>{editingOfferId ? 'Update this offer' : 'Add an offer'}</h3></div><button type="button" className="quiet-button" onClick={cancelOffer}>Cancel</button></div>
+        <div className="context-form">
+          <label className="context-field context-field--full">Offer name *<input required value={offerForm.name} onChange={(event) => setOfferForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name of your product or service" /></label>
+          <label className="context-field">What is it?<textarea value={offerForm.description} onChange={(event) => setOfferForm((current) => ({ ...current, description: event.target.value }))} placeholder="A short description" /></label>
+          <div className="offer-price-row"><label className="context-field">Price<input type="number" min="0" step="0.01" value={offerForm.price} onChange={(event) => setOfferForm((current) => ({ ...current, price: event.target.value }))} placeholder="Optional" /></label><label className="context-field">Currency<input value={offerForm.currency} onChange={(event) => setOfferForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} placeholder="NGN" maxLength={8} /></label></div>
+          <label className="context-field">What&apos;s included?<textarea value={offerForm.includedItems} onChange={(event) => setOfferForm((current) => ({ ...current, includedItems: event.target.value }))} placeholder="Deliverables, inclusions, or scope" /></label>
+          <label className="context-field">Key benefits<textarea value={offerForm.benefits} onChange={(event) => setOfferForm((current) => ({ ...current, benefits: event.target.value }))} placeholder="The outcomes customers care about" /></label>
+          <label className="context-field">Delivery information<textarea value={offerForm.deliveryInformation} onChange={(event) => setOfferForm((current) => ({ ...current, deliveryInformation: event.target.value }))} placeholder="Timeline, format, or fulfilment details" /></label>
+          <label className="context-field">Terms<textarea value={offerForm.terms} onChange={(event) => setOfferForm((current) => ({ ...current, terms: event.target.value }))} placeholder="Terms or limitations" /></label>
+          <label className="context-field context-field--full">Policies<textarea value={offerForm.policies} onChange={(event) => setOfferForm((current) => ({ ...current, policies: event.target.value }))} placeholder="Offer-specific policies" /></label>
+          <label className="active-offer-toggle context-field--full"><input type="checkbox" checked={offerForm.isActive} onChange={(event) => setOfferForm((current) => ({ ...current, isActive: event.target.checked }))} /><span><strong>Active offer</strong><small>Only one offer can be active at a time.</small></span></label>
+        </div>
+        <div className="context-form__actions"><button className="button button--accent" type="submit" disabled={savingOffer}>{savingOffer ? 'Saving offer…' : editingOfferId ? 'Save Offer' : 'Add Offer'} <span>→</span></button><button className="button button--outline" type="button" onClick={cancelOffer}>Cancel</button></div>
+      </form>}
+      {loading ? <LoadingState label="Loading offers" /> : offers.length ? <div className="offer-list">{offers.map((offer) => <article key={offer.id} className="offer-card"><div className="offer-card__heading"><div><div className="offer-card__meta"><span className={`offer-status ${offer.isActive ? 'is-active' : ''}`}>{offer.isActive ? 'Active' : 'Inactive'}</span>{displayPrice(offer) && <strong>{displayPrice(offer)}</strong>}</div><h3>{offer.name}</h3>{offer.description && <p>{offer.description}</p>}</div></div><div className="offer-card__actions"><button className="button button--outline button--small" type="button" onClick={() => beginOffer(offer)}>Edit</button><button className="button button--outline button--small" type="button" disabled={offerActionId === offer.id} onClick={() => void changeOfferActiveState(offer)}>{offerActionId === offer.id ? 'Saving…' : offer.isActive ? 'Deactivate' : 'Set Active'}</button><button className="offer-delete" type="button" disabled={offerActionId === offer.id} onClick={() => void removeOffer(offer)}>Delete</button></div></article>)}</div> : !offerEditorOpen && <EmptyState title="No offers yet" action={<button className="button button--accent" type="button" onClick={() => beginOffer()}>Add Your First Offer <span>→</span></button>}>Add the product or service you usually sell in conversations.</EmptyState>}
+    </section>
+  </div>;
+}
 
 function Dashboard() {
   const { supabase, user } = useCustomer();

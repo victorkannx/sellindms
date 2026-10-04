@@ -72,3 +72,55 @@ export type PaymentStatus = {
   currency: string;
   accessActive: boolean;
 };
+
+export type BusinessContext = {
+  id: string;
+  userId: string;
+  businessName: string;
+  description: string | null;
+  targetCustomer: string | null;
+  differentiator: string | null;
+  businessInformation: string | null;
+  policies: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BusinessContextInput = {
+  businessName: string;
+  description: string;
+  targetCustomer: string;
+  differentiator: string;
+  businessInformation: string;
+  policies: string;
+};
+
+export type Offer = {
+  id: string;
+  userId: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  currency: string;
+  includedItems: string | null;
+  benefits: string | null;
+  deliveryInformation: string | null;
+  terms: string | null;
+  policies: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OfferInput = {
+  name: string;
+  description: string;
+  price: number | null;
+  currency: string;
+  includedItems: string;
+  benefits: string;
+  deliveryInformation: string;
+  terms: string;
+  policies: string;
+  isActive: boolean;
+};

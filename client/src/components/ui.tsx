@@ -66,6 +66,7 @@ export const LoadingState = ({ label = 'Loading' }: { label?: string }) => <div 
 const mobileNavItems = [
   ['/app', 'Home'],
   ['/app/start-here', 'Start Here'],
+  ['/app/sales-context', 'AI Sales Context'],
   ['/app/search', 'Search'],
   ['/app/scripts', 'Browse Library'],
   ['/app/saved', 'Saved'],
@@ -120,6 +121,7 @@ export const AppSidebar = ({ onSignOut }: { onSignOut: () => void }) => (
     <nav className="sidebar-nav" aria-label="Customer navigation">
       <NavLink to="/app" end>Dashboard</NavLink>
       <NavLink to="/app/start-here">Start here</NavLink>
+      <NavLink to="/app/sales-context">AI Sales Context</NavLink>
       <NavLink to="/app/search">Search</NavLink>
       <NavLink to="/app/scripts">Browse library</NavLink>
       <NavLink to="/app/saved">Saved</NavLink>

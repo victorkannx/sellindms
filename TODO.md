@@ -121,3 +121,10 @@
 - Rank the most directly relevant script first. Required exact QA primaries are: “How much?” → SDM-010, The “How Much?” Opener; “They said it’s too expensive” → SDM-050, “It’s Too Expensive”; “Can you reduce the price?” → SDM-052, “Can You Give Me a Discount?”; “They stopped replying” → SDM-071, The First Follow-Up; “I need to ask my husband” → SDM-062, “I Need to Ask My Partner”. Keep genuinely related results underneath.
 - Also test and rank the most appropriate primary for: “they think my price is too high”; “customer says it costs too much”; “prospect went quiet”; “they haven’t replied”; “can I get a discount”; “I need to talk to my partner”; and “what should I say when someone asks my price”.
 - Verify actual result IDs/titles, not merely page rendering. Report the cause of the relevance failure, exact change, every required and additional QA result, and whether search QA passes. Do not make a real payment, fake transaction, fake order, or payment-infrastructure change.
+
+## 16. AI Sales Context
+
+- Add a private, entitlement-gated `/app/sales-context` page titled **AI Sales Context**. Preserve existing authentication, RLS, dashboard, library/search, favorites, recently viewed, resources, checkout, Flutterwave/payment/access flow, navigation, and mobile drawer.
+- Save and edit exactly one user-scoped business context using `business_contexts`; require business name, persist optional business details, expose loading/saving/success/error states, and retain information after refresh without creating duplicate contexts through the customer workflow.
+- Add user-scoped offer creation, editing, deletion confirmation, validation, status display, and active/inactive controls using `offers`. Safely deactivate a user’s current active offer before activating the selected offer, honoring `offers_one_active_per_user_idx`; zero active offers remains valid.
+- Keep all business-context and offer access browser-authenticated and RLS-backed. Do not add AI generation, change RLS/Auth/payment architecture, access another user’s records, expose secrets, or alter orders, product access, checkout, or Flutterwave.
