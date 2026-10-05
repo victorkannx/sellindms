@@ -6,11 +6,12 @@ permissions:
   contents: write
 jobs:
   migrate:
-    if: !contains(github.event.head_commit.message, '[paystack-migrated]')
+    if: ${{ !contains(github.event.head_commit.message, '[paystack-migrated]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: vercel-compatibility}
+        with:
+          ref: vercel-compatibility
       - name: Patch webhook
         run: |
           python - <<'PY'
