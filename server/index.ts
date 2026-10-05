@@ -600,4 +600,8 @@ const start = async () => {
   });
 };
 
-void start();
+export { app };
+
+if (process.env.VERCEL !== '1') {
+  void start();
+}
