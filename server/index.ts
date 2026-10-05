@@ -26,6 +26,7 @@ import {
   recordVerifiedTerminalFailure,
   revokeVerifiedRefund,
   secureEqual,
+  verifyPaystackWebhookSignature,
   verifyFlutterwaveTransaction,
   verifyFlutterwaveRefund,
   type ProductRecord,
@@ -253,41 +254,16 @@ app.get('/api/public/product', asyncRoute(async (_req, res) => {
   });
 }));
 
-app.post('/api/payments/flutterwave/webhook', express.raw({ type: 'application/json' }), asyncRoute(async (req, res) => {
-  const webhookSecret = requireConfig(runtimeConfig.flutterwaveWebhookSecret, 'FLUTTERWAVE_WEBHOOK_SECRET');
-  const signature = req.header('verif-hash');
-  if (!signature || !secureEqual(signature, webhookSecret)) {
-    return sendError(res, 401, 'INVALID_WEBHOOK_SIGNATURE', 'The Flutterwave webhook signature could not be verified.');
-  }
-
+app.post('/api/payments/paystack/webhook', express.raw({ type: 'application/json' }), asyncRoute(async (req, res) => {
   const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
-  const payload = JSON.parse(raw.toString('utf8')) as unknown;
-  if (isRefundWebhookPayload(payload)) {
-    const originalTransactionId = getRefundTransactionId(payload);
-    if (!originalTransactionId) {
-      return sendError(res, 400, 'MISSING_REFUND_TRANSACTION', 'The Flutterwave refund webhook did not include the original transaction ID.');
-    }
-    const verifiedRefund = await verifyFlutterwaveRefund(originalTransactionId);
-    if (isCompletedRefundStatus(verifiedRefund.status)) {
-      await revokeVerifiedRefund(originalTransactionId, verifiedRefund);
-    }
-    return res.status(200).json({ received: true });
+  const signature = req.header('x-paystack-signature');
+  if (!signature || !verifyPaystackWebhookSignature(raw, signature)) return sendError(res, 401, 'INVALID_WEBHOOK_SIGNATURE', 'The Paystack webhook signature could not be verified.');
+  const payload = JSON.parse(raw.toString('utf8'));
+  if (payload.event === 'charge.success') {
+    const reference = payload?.data?.reference;
+    if (!reference) return sendError(res, 400, 'MISSING_REFERENCE', 'The Paystack webhook did not include a transaction reference.');
+    await fulfillVerifiedTransaction(await verifyFlutterwaveTransaction(String(reference)));
   }
-
-  const data = payload && typeof payload === 'object' && 'data' in payload && payload.data && typeof payload.data === 'object'
-    ? payload.data as { id?: string | number; tx_ref?: string }
-    : {};
-  const transactionId = data.id;
-  if (!transactionId) {
-    return sendError(res, 400, 'MISSING_TRANSACTION', 'The Flutterwave webhook did not include a transaction ID.');
-  }
-
-  const verifiedTransaction = await verifyFlutterwaveTransaction(String(transactionId));
-  if (isTerminalChargeFailure(verifiedTransaction.status)) {
-    await recordVerifiedTerminalFailure(verifiedTransaction);
-    return res.status(200).json({ received: true });
-  }
-  await fulfillVerifiedTransaction(verifiedTransaction);
   return res.status(200).json({ received: true });
 }));
 
