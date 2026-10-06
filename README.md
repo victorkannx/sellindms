@@ -26,8 +26,7 @@ Use the secure project secret input flow for these values; do not put them in so
 | `BUILT_IN_FORGE_API_URL` / `BUILT_IN_FORGE_API_KEY` | Alternative Manus server-side AI provider pair |
 | `AI_REPLY_MODEL` | Optional server-side AI Reply model override; defaults to `gpt-5-mini` |
 | `PAYSTACK_SECRET_KEY` | Server-only Paystack checkout initialization, transaction verification, plan management, and webhook signature validation |
-| 
-| `APP_ORIGIN` | Browser-visible HTTPS origin used for the Supabase Auth callback and Flutterwave callback URL |
+| `APP_ORIGIN` | Browser-visible HTTPS origin used for the Supabase Auth callback and Paystack callback URL |
 | `SUPABASE_RESOURCE_BUCKET` | Required only if an active resource uses `storage_path` instead of `external_url` |
 
 After deployment, configure Flutterwave to send its webhook to:

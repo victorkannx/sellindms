@@ -9,9 +9,7 @@ export const runtimeConfig = {
   builtInForgeApiUrl: required('BUILT_IN_FORGE_API_URL'),
   builtInForgeApiKey: required('BUILT_IN_FORGE_API_KEY'),
   aiReplyModel: required('AI_REPLY_MODEL'),
-  
   paystackSecretKey: required('PAYSTACK_SECRET_KEY'),
-  
   appOrigin: required('APP_ORIGIN'),
   resourceBucket: required('SUPABASE_RESOURCE_BUCKET'),
 } as const;
