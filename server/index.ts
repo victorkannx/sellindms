@@ -465,17 +465,42 @@ app.post('/api/ai-replies', asyncRoute(async (req, res) => {
   }
 }));
 
-app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
-  const user = await authenticatedUser(req.header('authorization'));
-  if (!user.email) {
-    return sendError(res, 400, 'EMAIL_REQUIRED', 'An authenticated email address is required before payment.');
+const getOrCreatePaymentUser = async (email: string, fullName: string) => {
+  const admin = getAdminClient();
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: normalizedEmail,
+    email_confirm: false,
+    user_metadata: { full_name: fullName },
+  });
+  if (created.user) return created.user;
+  if (createError && !/already registered|already exists/i.test(createError.message)) throw createError;
+  for (let page = 1; page <= 100; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const found = data.users.find((candidate) => String(candidate.email || '').toLowerCase() === normalizedEmail);
+    if (found) return found;
+    if (data.users.length < 1000) break;
   }
+  throw new Error('The purchase account could not be prepared. Please try again.');
+};
 
+app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
+  const authorization = req.header('authorization');
+  const authenticated = authorization ? await authenticatedUser(authorization) : null;
+  const submittedEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const fullName = typeof req.body?.fullName === 'string' ? req.body.fullName.trim().slice(0, 160) : '';
+  if (!submittedEmail && !authenticated?.email) {
+    return sendError(res, 400, 'EMAIL_REQUIRED', 'Enter the email you want to use for your purchase and access.');
+  }
   if (!fullName) {
     return sendError(res, 400, 'NAME_REQUIRED', 'Enter your full name before continuing to payment.');
   }
-
+  const user = authenticated || await getOrCreatePaymentUser(submittedEmail, fullName);
+  const paymentEmail = user.email || submittedEmail;
+  if (!paymentEmail) {
+    return sendError(res, 400, 'EMAIL_REQUIRED', 'A valid email address is required before payment.');
+  }
   const productSlug = typeof req.body?.productSlug === 'string' ? req.body.productSlug.trim() : 'sell-in-dms-core';
   const { product, access } = await accessForProduct(user.id, productSlug);
   if (isActiveAccess(access)) {
@@ -511,7 +536,7 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
       reference,
       product: paymentProduct,
       userId: user.id,
-      email: user.email,
+      email: paymentEmail,
       fullName,
       redirectUrl: `${safeAppOrigin()}/api/payments/flutterwave/callback`,
     });

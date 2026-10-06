@@ -227,7 +227,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
         <Brand inverted />
         <div className="marketing-nav__actions">
           <a href="#how-it-works">How it works</a>
-          <Link className="button button--small button--light" to="/#pricing">Get Sell In DMs <span>→</span></Link>
+          <a className="button button--small button--light" href="#pricing">Get Sell In DMs <span>→</span></a>
         </div>
       </header>
 
@@ -237,7 +237,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
           <h1>Stop losing sales because you <em>don&apos;t know</em> what to say next.</h1>
           <p>Sell In DMs gives you practical scripts for turning everyday conversations into customers without sounding desperate, robotic, or pushy.</p>
           <div className="hero__actions">
-            <Link className="button button--accent" to="/#pricing">Get Sell In DMs <span>→</span></Link>
+            <a className="button button--accent" href="#pricing">Get Sell In DMs <span>→</span></a>
             <a className="text-link text-link--light" href="#how-it-works">See how it works <span>↓</span></a>
           </div>
           <p className="hero__note">Choose the tier that fits how you sell, then continue to secure checkout.</p>
@@ -334,8 +334,8 @@ function Landing({ configurationError }: { configurationError: string | null }) 
   );
 }
 
-function AuthPanel({ supabase, purpose = 'continue' }: { supabase: SupabaseClient | null; purpose?: string }) {
-  const [email, setEmail] = useState('');
+function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supabase: SupabaseClient | null; purpose?: string; initialEmail?: string }) {
+  const [email, setEmail] = useState(initialEmail);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -383,25 +383,52 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
   const [product, setProduct] = useState<Product | null>(null);
   const [productError, setProductError] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     getPublicProduct(requestedProduct).then(setProduct).catch((reason) => setProductError(reason instanceof Error ? reason.message : 'Product information is unavailable.'));
   }, [requestedProduct]);
-  useEffect(() => { if (user?.user_metadata?.full_name) setFullName(String(user.user_metadata.full_name)); }, [user]);
+  useEffect(() => {
+    if (user?.user_metadata?.full_name) setFullName(String(user.user_metadata.full_name));
+    if (user?.email) setEmail(user.email);
+  }, [user]);
 
   const startPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!supabase || !user) return;
-    setSubmitting(true); setError(null);
+    if (!product) return;
+    const paymentEmail = (user?.email || email).trim().toLowerCase();
+    if (!paymentEmail) {
+      setError('Enter the email you want to use for your purchase and access.');
+      return;
+    }
+    if (!fullName.trim()) {
+      setError('Enter your full name before continuing to payment.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
     try {
-      const { data } = await (supabase.auth as any).getSession();
-      if (!data.session?.access_token) throw new Error('Your sign-in session has expired. Please sign in again.');
-      const response = await fetch('/api/checkout/flutterwave', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ fullName, email: user.email, productSlug: requestedProduct }) });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (supabase && user) {
+        const { data } = await (supabase.auth as any).getSession();
+        if (data.session?.access_token) headers.Authorization = 'Bearer ' + data.session.access_token;
+      }
+      sessionStorage.setItem('sellindms_checkout_email', paymentEmail);
+      const response = await fetch('/api/checkout/flutterwave', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ fullName: fullName.trim(), email: paymentEmail, productSlug: requestedProduct }),
+      });
       if (!response.ok) await apiError(response);
       const body = await response.json() as { paymentUrl: string };
       window.location.assign(body.paymentUrl);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Payment could not be started.'); } finally { setSubmitting(false); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Payment could not be started.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const tierCopy = checkoutTierCopy[requestedProduct] || checkoutTierCopy['sell-in-dms-core'];
@@ -414,7 +441,42 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
   if (accessLoading) return <PageFrame><LoadingState label="Checking account access" /></PageFrame>;
   if (entitlement?.active) return <PageFrame><div className="access-message"><span>✓</span><h1>Your Sell In DMs access is already active.</h1><p>This account already has verified access to a Sell In DMs paid tier.</p><Link className="button button--accent" to="/app">Open your library <span>→</span></Link></div></PageFrame>;
 
-  return <PageFrame><div className="checkout-layout"><section className="checkout-intro"><div><span className="eyebrow">{tierCopy.eyebrow}</span><h1>{tierCopy.heading}</h1><p>{tierCopy.description}</p></div><div className="checkout-points">{tierCopy.points.map((point) => <span key={point}>✓ {point}</span>)}</div></section><section className="checkout-card"><div className="checkout-card__product"><div><span>PRODUCT</span><h2>{displayProductName}</h2></div><strong>{product ? formatProductPrice(product) : '—'}</strong></div>{productError && <div className="form-error">{productError}</div>}{configurationError && <div className="form-error">{configurationError}</div>}{!user ? <><div className="checkout-card__heading"><span>01</span><div><p>SECURE ACCOUNT</p><h2>Sign in first</h2></div></div><AuthPanel supabase={supabase} purpose={`continue with ${displayProductName}`} /></> : <form onSubmit={startPayment}><div className="checkout-card__heading"><span>02</span><div><p>PAYMENT DETAILS</p><h2>Ready to pay securely</h2></div></div><label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label><label className="field-label">Email<input value={user.email || ''} disabled /></label><div className="payment-method"><div><b>PAY</b><span><strong>Paystack</strong><small>Secure payment</small></span></div><i>Selected</i></div><button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Connecting to Paystack…' : `Pay ${product ? formatProductPrice(product) : ''}`} <span>→</span></button><p className="checkout-card__legal">A payment success screen alone never grants access. Your entitlement is checked after Paystack verification.</p>{error && <div className="form-error">{error}</div>}<button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout'); }}>Use a different account</button></form>}</section></div></PageFrame>;
+  return <PageFrame><div className="checkout-layout"><section className="checkout-intro"><div><span className="eyebrow">{tierCopy.eyebrow}</span><h1>{tierCopy.heading}</h1><p>{tierCopy.description}</p></div><div className="checkout-points">{tierCopy.points.map((point) => <span key={point}>✓ {point}</span>)}</div></section><section className="checkout-card">
+        <div className="checkout-card__product">
+          <div><span>PRODUCT</span><h2>{displayProductName}</h2></div>
+          <strong>{product ? formatProductPrice(product) : '—'}</strong>
+        </div>
+        {product && (
+          <div className="checkout-card__summary">
+            <div>
+              <span className="checkout-card__summary-label">WHAT YOU GET</span>
+              <ul className="checkout-card__benefits">
+                {tierCopy.points.map((point) => <li key={point}>✓ {point}</li>)}
+              </ul>
+            </div>
+            <div className="checkout-card__billing">
+              <span>CHARGE TODAY</span>
+              <strong>{formatProductPrice(product)}</strong>
+              <small>{requestedProduct === 'sell-in-dms-core' ? 'One-time payment' : requestedProduct === 'sell-in-dms-pro' ? '$29/mo equivalent · billed annually' : '$49/mo equivalent · billed annually'}</small>
+            </div>
+          </div>
+        )}
+        {productError && <div className="form-error">{productError}</div>}
+        {configurationError && <div className="form-error">{configurationError}</div>}
+        <form onSubmit={startPayment}>
+          <div className="checkout-card__heading">
+            <span>01</span>
+            <div><p>SECURE CHECKOUT</p><h2>{user ? 'Ready to pay securely' : 'Enter your details to continue'}</h2></div>
+          </div>
+          <label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label>
+          <label className="field-label">Email<input required type="email" value={user?.email || email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com" /></label>
+          <div className="payment-method"><div><b>PAY</b><span><strong>Paystack</strong><small>Secure payment</small></span></div><i>Selected</i></div>
+          <button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Connecting to Paystack…' : 'Pay ' + (product ? formatProductPrice(product) : '')} <span>→</span></button>
+          <p className="checkout-card__legal">You do not need an account before paying. After payment, use this same email to receive a secure sign-in link and unlock your verified access.</p>
+          {error && <div className="form-error">{error}</div>}
+          {user && <button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout?product=' + encodeURIComponent(requestedProduct)); }}>Use a different account</button>}
+        </form>
+      </section></div></PageFrame>;
 }
 
 function PaymentResult({ supabase, user, successful }: { supabase: SupabaseClient | null; user: User | null; successful: boolean }) {
@@ -423,6 +485,7 @@ function PaymentResult({ supabase, user, successful }: { supabase: SupabaseClien
   const [loading, setLoading] = useState(successful);
   const [error, setError] = useState<string | null>(null);
   const reference = params.get('reference');
+  const [checkoutEmail] = useState(() => sessionStorage.getItem('sellindms_checkout_email') || '');
   const check = useCallback(async () => {
     if (!successful || !reference || !supabase || !user) { setLoading(false); return; }
     setLoading(true); setError(null);
@@ -436,7 +499,7 @@ function PaymentResult({ supabase, user, successful }: { supabase: SupabaseClien
   }, [reference, successful, supabase, user]);
   useEffect(() => { void check(); }, [check]);
 
-  if (successful && !user) return <PageFrame><div className="access-message"><span>↳</span><h1>One more secure step.</h1><p>Payment returns are not proof of access. Sign in to check the verified payment status attached to your account.</p><AuthPanel supabase={supabase} purpose="check your payment status" /></div></PageFrame>;
+  if (successful && !user) return <PageFrame><div className="access-message"><span>↳</span><h1>One more secure step.</h1><p>Payment returns are not proof of access. Sign in to check the verified payment status attached to your account.</p><AuthPanel supabase={supabase} purpose="check your payment status and unlock access" initialEmail={checkoutEmail} /></div></PageFrame>;
   if (!successful) return <PageFrame><div className="access-message"><span>×</span><h1>Payment wasn&apos;t completed.</h1><p>No access has been granted. You can return to checkout whenever you&apos;re ready.</p><Link className="button button--accent" to="/checkout">Return to checkout <span>→</span></Link></div></PageFrame>;
   if (loading) return <PageFrame><LoadingState label="Checking verified payment status" /></PageFrame>;
   if (error) return <PageFrame><div className="access-message"><span>!</span><h1>We couldn&apos;t verify that yet.</h1><p>{error}</p><button className="button button--accent" onClick={() => void check()}>Check again <span>↻</span></button></div></PageFrame>;
