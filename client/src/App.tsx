@@ -2,6 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppSidebar, Brand, Chip, EmptyState, formatNaira, LoadingState, MobileNav, ScriptCard, SearchForm } from './components/ui';
+
+const formatProductPrice = (product: { price: number; currency: string }) =>
+  product.currency.toUpperCase() === 'NGN'
+    ? formatProductPrice(product)
+    : new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency }).format(product.price);
+
+
 import {
   deleteOffer,
   generateAiReply,
@@ -188,7 +195,6 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       name: 'Script Library',
       label: 'START HERE',
       price: '$9',
-      localPrice: '₦7,500',
       description: '100 practical DM reply scripts plus the resources you need to use them immediately.',
       features: ['100 DM reply scripts', 'Searchable customer library', 'Start Here guide', 'Objection Cheat Sheet', 'Copy and save scripts'],
     },
@@ -286,7 +292,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
                 <div className="pricing-card__top"><span>{tier.label}</span>{tier.slug === 'sell-in-dms-pro' && <b>10% annual saving</b>}</div>
                 <h3>{tier.name}</h3>
                 <p className="pricing-card__description">{tier.description}</p>
-                <div className="pricing-card__price"><strong>{tier.price}</strong><small>{tier.localPrice}</small></div>
+                <div className="pricing-card__price"><strong>{tier.price}</strong>{tier.localPrice && <small>{tier.localPrice}</small>}</div>
                 <ul>{tier.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul>
                 <Link
                   className={'button ' + (tier.slug === 'sell-in-dms-pro' ? 'button--accent' : 'button--light') + ' button--full'}
@@ -303,7 +309,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       </section>
 
       <section className="included shell">
-        <div><div className="section-kicker">WHAT&apos;S INSIDE</div><h2>A field guide for the conversations that matter.</h2>{products.find((item) => item.slug === 'sell-in-dms-core') ? <p className="price-note">{products.find((item) => item.slug === 'sell-in-dms-core')!.name} Â· {formatNaira(products.find((item) => item.slug === 'sell-in-dms-core')!.price)} Â· One-time access</p> : <p className="price-note">{productError || configurationError || 'Product details load securely from Supabase.'}</p>}</div>
+        <div><div className="section-kicker">WHAT&apos;S INSIDE</div><h2>A field guide for the conversations that matter.</h2>{products.find((item) => item.slug === 'sell-in-dms-core') ? <p className="price-note">{products.find((item) => item.slug === 'sell-in-dms-core')!.name} Â· {formatProductPrice(products.find((item) => item.slug === 'sell-in-dms-core')!)} Â· One-time access</p> : <p className="price-note">{productError || configurationError || 'Product details load securely from Supabase.'}</p>}</div>
         <div className="included__list">
           {['100 practical DM scripts', 'Search by real situation', 'Objection handling & follow-up', 'Stage, category & niche browsing', 'Favorites & recently viewed', 'Active downloadable resources'].map((item, index) => <div key={item}><span>0{index + 1}</span><p>{item}</p><b>â</b></div>)}
         </div>
@@ -377,7 +383,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
   if (accessLoading) return <PageFrame><LoadingState label="Checking account access" /></PageFrame>;
   if (entitlement?.active) return <PageFrame><div className="access-message"><span>â</span><h1>Your library is ready.</h1><p>This account already has verified access to Sell In DMs Core.</p><Link className="button button--accent" to="/app">Open your library <span>â</span></Link></div></PageFrame>;
 
-  return <PageFrame><div className="checkout-layout"><section className="checkout-intro"><Brand /><div><span className="eyebrow">ONE-TIME ACCESS</span><h1>Keep your next conversation <em>clear.</em></h1><p>Start with a secure sign-in. Payment is completed through Paystack, and access is granted only after the payment is verified server-side.</p></div><div className="checkout-points"><span>â Live product entitlement check</span><span>â Secure Paystack payment</span><span>â Searchable customer library</span></div></section><section className="checkout-card"><div className="checkout-card__product"><div><span>PRODUCT</span><h2>{product?.name || 'Sell In DMs Core'}</h2></div><strong>{product ? formatNaira(product.price) : 'â'}</strong></div>{productError && <div className="form-error">{productError}</div>}{configurationError && <div className="form-error">{configurationError}</div>}{!user ? <><div className="checkout-card__heading"><span>01</span><div><p>SECURE ACCOUNT</p><h2>Sign in first</h2></div></div><AuthPanel supabase={supabase} purpose="connect payment to your account" /></> : <form onSubmit={startPayment}><div className="checkout-card__heading"><span>02</span><div><p>PAYMENT DETAILS</p><h2>Ready to pay securely</h2></div></div><label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label><label className="field-label">Email<input value={user.email || ''} disabled /></label><div className="payment-method"><div><b>FLW</b><span><strong>Flutterwave</strong><small>Secure one-time payment</small></span></div><i>Selected</i></div><button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Connecting to Flutterwaveâ¦' : `Pay ${product ? formatNaira(product.price) : ''}`} <span>â</span></button><p className="checkout-card__legal">A payment success screen alone never grants access. Your entitlement is checked after Flutterwave verification.</p>{error && <div className="form-error">{error}</div>}<button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout'); }}>Use a different account</button></form>}</section></div></PageFrame>;
+  return <PageFrame><div className="checkout-layout"><section className="checkout-intro"><div><span className="eyebrow">ONE-TIME ACCESS</span><h1>Keep your next conversation <em>clear.</em></h1><p>Start with a secure sign-in. Payment is completed through Paystack, and access is granted only after the payment is verified server-side.</p></div><div className="checkout-points"><span>â Live product entitlement check</span><span>â Secure Paystack payment</span><span>â Searchable customer library</span></div></section><section className="checkout-card"><div className="checkout-card__product"><div><span>PRODUCT</span><h2>{product?.name || 'Sell In DMs Core'}</h2></div><strong>{product ? formatNaira(product.price) : 'â'}</strong></div>{productError && <div className="form-error">{productError}</div>}{configurationError && <div className="form-error">{configurationError}</div>}{!user ? <><div className="checkout-card__heading"><span>01</span><div><p>SECURE ACCOUNT</p><h2>Sign in first</h2></div></div><AuthPanel supabase={supabase} purpose="connect payment to your account" /></> : <form onSubmit={startPayment}><div className="checkout-card__heading"><span>02</span><div><p>PAYMENT DETAILS</p><h2>Ready to pay securely</h2></div></div><label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label><label className="field-label">Email<input value={user.email || ''} disabled /></label><div className="payment-method"><div><b>PAY</b><span><strong>Paystack</strong><small>Secure payment</small></span></div><i>Selected</i></div><button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Connecting to Paystackâ¦' : `Pay ${product ? formatNaira(product.price) : ''}`} <span>â</span></button><p className="checkout-card__legal">A payment success screen alone never grants access. Your entitlement is checked after Paystack verification.</p>{error && <div className="form-error">{error}</div>}<button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout'); }}>Use a different account</button></form>}</section></div></PageFrame>;
 }
 
 function PaymentResult({ supabase, user, successful }: { supabase: SupabaseClient | null; user: User | null; successful: boolean }) {

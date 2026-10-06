@@ -200,6 +200,14 @@ const getProductBySlug = async (slug: string): Promise<ProductRecord> => {
   return data as ProductRecord;
 };
 
+
+const localizeProductForCountry = (product: ProductRecord, country: string | undefined): ProductRecord => {
+  if (String(country || '').toUpperCase() === 'NG' && product.slug === 'sell-in-dms-core') {
+    return { ...product, price: 7500, currency: 'NGN' };
+  }
+  return product;
+};
+
 const getCoreProduct = async (): Promise<ProductRecord> => getProductBySlug('sell-in-dms-core');
 
 const accessForUser = async (userId: string) => {
@@ -270,7 +278,8 @@ app.get('/api/public/config', (_req, res) => {
   return res.json(config);
 });
 
-app.get('/api/public/products', asyncRoute(async (_req, res) => {
+app.get('/api/public/products', asyncRoute(async (req, res) => {
+  const country = req.header('x-vercel-ip-country');
   const { data, error } = await getAdminClient()
     .from('products')
     .select('id, name, slug, price, currency, product_type')
@@ -278,20 +287,23 @@ app.get('/api/public/products', asyncRoute(async (_req, res) => {
     .eq('is_active', true);
   if (error) throw error;
   res.json({
-    products: (data ?? []).map((product: any) => ({
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      price: Number(product.price),
-      currency: product.currency,
-      productType: product.product_type,
-    })),
+    products: (data ?? []).map((product: any) => {
+      const localized = localizeProductForCountry(product as ProductRecord, country);
+      return {
+        id: localized.id,
+        name: localized.name,
+        slug: localized.slug,
+        price: Number(localized.price),
+        currency: localized.currency,
+        productType: localized.product_type,
+      };
+    }),
   });
 }));
 
 app.get('/api/public/product', asyncRoute(async (req, res) => {
   const slug = typeof req.query.slug === 'string' ? req.query.slug : 'sell-in-dms-core';
-  const product = await getProductBySlug(slug);
+  const product = localizeProductForCountry(await getProductBySlug(slug), req.header('x-vercel-ip-country'));
   res.json({
     id: product.id,
     name: product.name,
@@ -478,14 +490,15 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   });
   if (profileError) throw profileError;
 
+  const paymentProduct = localizeProductForCountry(product, req.header('x-vercel-ip-country'));
   const reference = createPaymentReference();
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
       user_id: user.id,
-      product_id: product.id,
-      amount: Number(product.price),
-      currency: product.currency,
+      product_id: paymentProduct.id,
+      amount: Number(paymentProduct.price),
+      currency: paymentProduct.currency,
       status: 'pending',
       flutterwave_reference: reference,
     })
@@ -496,7 +509,7 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   try {
     const paymentUrl = await initializeFlutterwavePayment({
       reference,
-      product,
+      product: paymentProduct,
       userId: user.id,
       email: user.email,
       fullName,
