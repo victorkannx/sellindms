@@ -111,7 +111,14 @@ export const getEntitlement = async (supabase: SupabaseClient): Promise<Entitlem
     .eq('is_active', true);
   if (productError) throw productError;
 
-  const productList = (products ?? []) as Product[];
+  const productList: Product[] = (products ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    slug: item.slug,
+    price: item.price,
+    currency: item.currency,
+    productType: item.product_type === 'subscription' ? 'one_time' : item.product_type,
+  }));
   if (!productList.length) return { active: false, product: null, expiresAt: null };
 
   const { data: accesses, error: accessError } = await supabase

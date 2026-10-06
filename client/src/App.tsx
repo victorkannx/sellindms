@@ -11,6 +11,7 @@ import {
   getActiveOffer,
   getOffers,
   getPublicProduct,
+  getPublicProducts,
   getRecentAiReplySessions,
   getRecentlyViewed,
   getRelatedScripts,
@@ -302,7 +303,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       </section>
 
       <section className="included shell">
-        <div><div className="section-kicker">WHAT&apos;S INSIDE</div><h2>A field guide for the conversations that matter.</h2>{product ? <p className="price-note">{product.name} Â· {formatNaira(product.price)} Â· One-time access</p> : <p className="price-note">{productError || configurationError || 'Product details load securely from Supabase.'}</p>}</div>
+        <div><div className="section-kicker">WHAT&apos;S INSIDE</div><h2>A field guide for the conversations that matter.</h2>{products.find((item) => item.slug === 'sell-in-dms-core') ? <p className="price-note">{products.find((item) => item.slug === 'sell-in-dms-core')!.name} Â· {formatNaira(products.find((item) => item.slug === 'sell-in-dms-core')!.price)} Â· One-time access</p> : <p className="price-note">{productError || configurationError || 'Product details load securely from Supabase.'}</p>}</div>
         <div className="included__list">
           {['100 practical DM scripts', 'Search by real situation', 'Objection handling & follow-up', 'Stage, category & niche browsing', 'Favorites & recently viewed', 'Active downloadable resources'].map((item, index) => <div key={item}><span>0{index + 1}</span><p>{item}</p><b>â</b></div>)}
         </div>
