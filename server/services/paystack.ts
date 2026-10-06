@@ -16,7 +16,7 @@ const api=async<T>(path:string,init?:RequestInit):Promise<T>=>{
 const subunit=(n:number|string)=>{const v=Number(n);if(!Number.isFinite(v)||v<=0)throw new Error('Invalid payment amount.');return Math.round(v*100);};
 export const createPaymentReference=()=> 'sidm_'+crypto.randomUUID().replaceAll('-','');
 
-type PaystackPlan={code:string;name:string;amount:number;currency:string;interval:string};
+type PaystackPlan={plan_code?:string;code?:string;name:string;amount:number;currency:string;interval:string};
 export type BillingInterval='monthly'|'annually';
 const planCache=new Map<string,string>();
 const subscriptionPlanConfig=(product:ProductRecord, billingInterval:BillingInterval)=>{
@@ -52,11 +52,13 @@ export const ensurePaystackPlan=async(product:ProductRecord,billingInterval:Bill
   if(cached) return cached;
   const plans=await api<PaystackPlan[]>('/plan?perPage=100');
   const existing=plans.find(p=>p.name===config.name&&Number(p.amount)===amount&&String(p.currency).toUpperCase()===currency&&String(p.interval).toLowerCase()===config.interval);
-  if(existing?.code){planCache.set(cacheKey,existing.code);return existing.code;}
+  const existingPlanCode=existing?.plan_code||existing?.code;
+  if(existingPlanCode){planCache.set(cacheKey,existingPlanCode);return existingPlanCode;}
   const created=await api<PaystackPlan>('/plan',{method:'POST',body:JSON.stringify({name:config.name,amount,currency,interval:config.interval,description:config.description,send_sms:false,send_invoices:true})});
-  if(!created?.code) throw new Error('Paystack created the subscription plan without returning a plan code.');
-  planCache.set(cacheKey,created.code);
-  return created.code;
+  const createdPlanCode=created?.plan_code||created?.code;
+  if(!createdPlanCode) throw new Error('Paystack created the subscription plan without returning a plan code.');
+  planCache.set(cacheKey,createdPlanCode);
+  return createdPlanCode;
 };
 export const initializeFlutterwavePayment=async(i:{reference:string;product:ProductRecord;userId:string;email:string;fullName:string;redirectUrl:string;billingInterval?:BillingInterval})=>{
  const billingInterval=i.product.product_type==='subscription'?(i.billingInterval??'monthly'):undefined;
