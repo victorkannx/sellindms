@@ -264,7 +264,7 @@ app.get('/_app/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'sell-in-dms' });
 });
 
-app.get('/api/public/config', (_req, res) => {
+app.get('/api/public/config', (req, res) => {
   const config = publicSupabaseConfig();
   if (!config) {
     return sendError(
@@ -272,34 +272,59 @@ app.get('/api/public/config', (_req, res) => {
       503,
       'SUPABASE_CLIENT_NOT_CONFIGURED',
       'Supabase client configuration is not available yet.',
-      { required: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'APP_ORIGIN'] },
+      { required: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'] },
     );
   }
-  return res.json(config);
+
+  const forwardedHost = req.header('x-forwarded-host') || req.header('host');
+  const forwardedProto = req.header('x-forwarded-proto') || 'https';
+  const requestOrigin = forwardedHost ? forwardedProto + '://' + forwardedHost : null;
+
+  return res.json({
+    ...config,
+    authCallbackUrl: config.authCallbackUrl || (requestOrigin ? requestOrigin + '/auth/callback' : null),
+  });
 });
 
 app.get('/api/public/products', asyncRoute(async (req, res) => {
   const country = req.header('x-vercel-ip-country');
-  const { data, error } = await getAdminClient()
-    .from('products')
-    .select('id, name, slug, price, currency, product_type')
-    .in('slug', [...SELL_IN_DMS_PRODUCT_SLUGS])
-    .eq('is_active', true);
-  if (error) throw error;
-  res.json({
-    products: (data ?? []).map((product: any) => {
-      const localized = localizeProductForCountry(product as ProductRecord, country);
-      return {
-        id: localized.id,
-        name: localized.name,
-        slug: localized.slug,
-        price: Number(localized.price),
-        currency: localized.currency,
-        productType: localized.product_type,
-      };
-    }),
-  });
+  try {
+    const { data, error } = await getAdminClient()
+      .from('products')
+      .select('id, name, slug, price, currency, product_type')
+      .in('slug', [...SELL_IN_DMS_PRODUCT_SLUGS])
+      .eq('is_active', true);
+    if (error) throw error;
+    res.json({
+      products: (data ?? []).map((product: any) => {
+        const localized = localizeProductForCountry(product as ProductRecord, country);
+        return {
+          id: localized.id,
+          name: localized.name,
+          slug: localized.slug,
+          price: Number(localized.price),
+          currency: localized.currency,
+          productType: localized.product_type,
+        };
+      }),
+    });
+  } catch (error) {
+    return sendError(res, 503, 'PRODUCT_CATALOG_NOT_CONFIGURED', 'The product catalog is not connected on this deployment yet.', {
+      detail: error instanceof Error ? error.message : 'Supabase product catalog unavailable.',
+    });
+  }
 }));
+
+app.get('/api/public/config/status', (_req, res) => {
+  res.json({
+    supabaseUrl: Boolean(runtimeConfig.supabaseUrl),
+    supabaseAnonKey: Boolean(runtimeConfig.supabaseAnonKey),
+    supabaseServiceRoleKey: Boolean(runtimeConfig.supabaseServiceRoleKey),
+    paystackSecretKey: Boolean(process.env.PAYSTACK_SECRET_KEY),
+    appOrigin: Boolean(runtimeConfig.appOrigin),
+    openaiApiKey: Boolean(runtimeConfig.openaiApiKey),
+  });
+});
 
 app.get('/api/public/product', asyncRoute(async (req, res) => {
   const slug = typeof req.query.slug === 'string' ? req.query.slug : 'sell-in-dms-core';

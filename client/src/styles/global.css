@@ -1271,3 +1271,107 @@ button, input { font-weight: 500; }
     line-height: 1.55;
   }
 }
+
+
+/* Checkout refinement: more breathing room, clearer payment guidance, no cramped mobile stacking. */
+.checkout-status {
+  display: grid;
+  gap: 6px;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border-left: 2px solid var(--accent);
+  background: #f7f2e9;
+  color: var(--text-primary);
+}
+.checkout-status strong { font-size: 13px; line-height: 1.35; }
+.checkout-status p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+.checkout-card__intro {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 18px 0 2px;
+  border-top: 1px solid #e7e2d9;
+}
+.checkout-card__intro p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.checkout-card form { margin-top: 4px; }
+.checkout-card__product { min-height: 70px; }
+.checkout-card__product > div { min-width: 0; }
+.checkout-card__product strong { white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .checkout-layout { gap: 30px; padding: 0 0 48px; }
+  .checkout-intro { gap: 20px; }
+  .checkout-intro h1 { max-width: 12ch; margin: 12px 0 14px; font-size: clamp(38px, 10.8vw, 48px); line-height: 1.02; }
+  .checkout-intro p { max-width: 34rem; font-size: 14px; line-height: 1.65; }
+  .checkout-points { grid-template-columns: 1fr; gap: 8px; padding-top: 16px; font-size: 12px; }
+  .checkout-card {
+    padding: 28px 22px 30px;
+    border: 1px solid #d9d3c8;
+    border-radius: 4px;
+    box-shadow: 0 14px 32px rgba(17,17,15,.07);
+  }
+  .checkout-card__product {
+    align-items: flex-start;
+    gap: 16px;
+    min-height: 0;
+    padding-bottom: 18px;
+  }
+  .checkout-card__product h2 { margin-top: 8px; font-size: 24px; line-height: 1.12; }
+  .checkout-card__product strong { padding-top: 2px; font-size: 20px; }
+  .checkout-card__summary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin: 0;
+    padding: 18px 0 0;
+    border-bottom: 0;
+  }
+  .checkout-card__benefits { gap: 7px; margin-top: 10px; font-size: 12px; line-height: 1.55; }
+  .checkout-card__billing {
+    min-width: 0;
+    padding: 16px 0 0;
+    border-top: 1px solid #e7e2d9;
+    border-left: 0;
+  }
+  .checkout-card__billing strong { margin-top: 6px; font-size: 24px; }
+  .checkout-card__billing small { max-width: none; font-size: 10px; }
+  .checkout-card__intro {
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 18px;
+  }
+  .checkout-card__intro p { font-size: 13px; line-height: 1.65; }
+  .checkout-status { margin-top: 18px; padding: 13px 14px; }
+  .checkout-card__heading { gap: 11px; margin: 24px 0 18px; }
+  .checkout-card__heading > span { width: 26px; height: 26px; flex-basis: 26px; }
+  .checkout-card__heading h2 { font-size: 21px; line-height: 1.15; }
+  .checkout-card form { gap: 14px; }
+  .checkout-card .field-label { gap: 7px; font-size: 9px; }
+  .checkout-card .field-label input { min-height: 52px; padding: 0 14px; font-size: 15px; }
+  .checkout-card .button--full { min-height: 54px; margin-top: 4px; }
+  .checkout-card__legal { font-size: 10px; line-height: 1.55; }
+}
+
+/* Pricing cards: intuitive CTAs and a calmer mobile stack. */
+.pricing-card .button { min-height: 50px; }
+@media (max-width: 640px) {
+  .pricing { padding-top: 3.5rem; }
+  .pricing__heading { gap: 16px; margin-top: 10px; margin-bottom: 28px; }
+  .pricing__heading h2 { max-width: 12ch; font-size: clamp(34px, 9vw, 40px); line-height: 1.08; }
+  .pricing__heading p { font-size: 14px; line-height: 1.65; }
+  .pricing__grid { gap: 16px; }
+  .pricing-card {
+    padding: 24px 20px;
+    border-color: rgba(255,255,255,.18);
+  }
+  .pricing-card h3 { margin-top: 18px; font-size: 26px; }
+  .pricing-card__description { min-height: 0; margin-top: 10px; font-size: 14px; line-height: 1.6; }
+  .pricing-card__price { margin: 18px 0; padding: 16px 0; }
+  .pricing-card ul { gap: 8px; margin-bottom: 20px; font-size: 13px; }
+}

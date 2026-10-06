@@ -198,8 +198,8 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       label: 'START HERE',
       price: '$9',
       localPrice: '',
-      description: '100 practical DM reply scripts plus the resources you need to use them immediately.',
-      features: ['100 DM reply scripts', 'Searchable customer library', 'Start Here guide', 'Objection Cheat Sheet', 'Copy and save scripts'],
+      description: '100 practical replies for the moments that usually stall a DM sale.',
+      features: ['100 practical DM reply scripts', 'Search by real sales situation', 'Start Here guide', 'Objection Cheat Sheet', 'Copy and save scripts'],
     },
     {
       slug: 'sell-in-dms-pro',
@@ -207,8 +207,8 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       label: 'BEST VALUE',
       price: '$29/mo',
       localPrice: '$313.20 billed annually',
-      description: 'The complete Sell In DMs application, including AI Reply and sales-format scripts from first message to close.',
-      features: ['Everything in Script Library', 'Complete application access', 'Sales-format scripts', 'AI Reply', 'Full customer dashboard'],
+      description: 'The full workspace for handling the sales conversation from the first message to the close.',
+      features: ['Everything in Script Library', 'Full customer workspace', 'Sales-format scripts', 'AI Reply', 'Saved replies and activity'],
     },
     {
       slug: 'sell-in-dms-automation',
@@ -216,7 +216,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       label: 'AUTOMATION',
       price: '$49/mo',
       localPrice: '$529.20 billed annually',
-      description: 'Everything in Pro, with the future social-media and marketing reply automation layer.',
+      description: 'Everything in Pro, with the future layer for connecting social conversations to automated replies.',
       features: ['Everything in Pro', 'Future social-media integrations', 'Marketing reply automation'],
     },
   ] as const;
@@ -284,8 +284,8 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       <section id="pricing" className="pricing shell">
         <div className="section-kicker">CHOOSE YOUR LEVEL</div>
         <div className="pricing__heading">
-          <div><h2>Start with the scripts. Upgrade when you need more.</h2></div>
-          <p>Three paid tiers. No confusing free plan. Pick the level that matches how much of the sales conversation you want Sell In DMs to handle.</p>
+          <div><h2>Start with the scripts. Upgrade when the conversation needs more.</h2></div>
+          <p>Choose the level that matches how much help you want while selling in DMs: practical scripts, a complete sales workspace, or the future automation layer.</p>
         </div>
         <div className="pricing__grid">
           {tierCards.map((tier) => {
@@ -300,7 +300,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
                   className={'button ' + (tier.slug === 'sell-in-dms-pro' ? 'button--accent' : 'button--light') + ' button--full'}
                   to={'/checkout?product=' + encodeURIComponent(tier.slug)}
                 >
-                  {'Choose ' + tier.name} <span>→</span>
+                  {tier.slug === 'sell-in-dms-core' ? 'Get the scripts' : tier.slug === 'sell-in-dms-pro' ? 'Get Pro' : 'Get Automation'} <span>→</span>
                 </Link>
               </article>
             );
@@ -357,19 +357,19 @@ function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supa
 const checkoutTierCopy: Record<string, { eyebrow: string; heading: string; description: string; points: string[] }> = {
   'sell-in-dms-core': {
     eyebrow: 'SCRIPT LIBRARY',
-    heading: 'The right reply, when you need it.',
-    description: '100 practical DM scripts, organized by real sales situations.',
-    points: ['100 DM reply scripts', 'Searchable library', 'Sales resources'],
+    heading: 'Get the scripts. Know what to say next.',
+    description: '100 practical DM replies for real sales situations, ready when a conversation gets stuck.',
+    points: ['100 practical replies', 'Search by situation', 'One-time access'],
   },
   'sell-in-dms-pro': {
     eyebrow: 'SELL IN DMs PRO',
-    heading: 'A complete system for selling in DMs.',
-    description: 'Scripts, AI Reply, and the full customer workspace from first message to close.',
-    points: ['Full application', 'Sales-format scripts', 'AI Reply'],
+    heading: 'Keep the whole sales conversation moving.',
+    description: 'Get the scripts, AI Reply, and the complete workspace for turning interested conversations into customers.',
+    points: ['Full customer workspace', 'Sales-format scripts', 'AI Reply'],
   },
   'sell-in-dms-automation': {
     eyebrow: 'SELL IN DMs AUTOMATION',
-    heading: 'Turn replies into a sales workflow.',
+    heading: 'Build toward a sales workflow that runs with you.',
     description: 'Everything in Pro, plus the future automation layer for social and marketing replies.',
     points: ['Everything in Pro', 'Social integrations', 'Marketing reply automation'],
   },
@@ -460,8 +460,14 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
             </div>
           </div>
         )}
-        {productError && <div className="form-error">{productError}</div>}
-        {configurationError && <div className="form-error">{configurationError}</div>}
+        {(productError || configurationError) && <div className="checkout-status" role="status">
+          <strong>{productError ? 'We’re connecting your product details.' : 'We’re connecting your secure checkout.'}</strong>
+          <p>{productError || 'Supabase is not active on this deployment yet. Your payment details will not be collected until checkout is ready.'}</p>
+        </div>}
+        <div className="checkout-card__intro">
+          <span className="checkout-card__summary-label">YOU’RE ALMOST THERE</span>
+          <p>Enter your name and email below. We’ll take you to secure payment, then use this email to give you access after the payment is verified.</p>
+        </div>
         <form onSubmit={startPayment}>
           <div className="checkout-card__heading">
             <span>01</span>
@@ -470,7 +476,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
           <label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label>
           <label className="field-label">Email<input required type="email" value={user?.email || email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com" /></label>
           <button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Preparing checkout…' : 'Continue to payment'} <span>→</span></button>
-          <p className="checkout-card__legal">No account needed before payment. We&apos;ll use this email for secure access after your purchase.</p>
+          <p className="checkout-card__legal">No account is needed before payment. We use your email to match the verified purchase to your Sell In DMs access.</p>
           {error && <div className="form-error">{error}</div>}
           {user && <button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout?product=' + encodeURIComponent(requestedProduct)); }}>Use a different account</button>}
         </form>
