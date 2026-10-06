@@ -274,10 +274,10 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       </section>
 
       <section className="compare shell">
-        <div className="compare__header"><div><div className="section-kicker">A BETTER NEXT MOVE</div><h2>Don&apos;t fill the silence with a <em>pitch.</em></h2></div><p>When someone asks about price, clarity beats pressure. The library helps you respond to the moment—not talk over it.</p></div>
+        <div className="compare__header"><div><div className="section-kicker">A BETTER NEXT MOVE</div><h2>Don&apos;t fill the silence with a <em>pitch.</em></h2></div><p>When price comes up, clarity beats pressure.</p></div>
         <div className="compare__cards">
           <article className="reply-block reply-block--avoid"><span>DON&apos;T SEND THIS</span><p>“Yes, I can help. The price is ₦50,000. Let me know if you&apos;re interested.”</p><small>A price drop without context can end the conversation.</small></article>
-          <article className="reply-block reply-block--better"><span>SELL IN DMs RESPONSE</span><p>Open the approved response built for the situation, understand why it works, then copy it when it fits.</p><small>Real replies load from the paid script library—never from generic filler.</small></article>
+          <article className="reply-block reply-block--better"><span>SELL IN DMs RESPONSE</span><p>Use the response built for the situation. Understand why it works, then send it when it fits.</p><small>Practical replies from the paid script library.</small></article>
         </div>
       </section>
 
@@ -289,7 +289,6 @@ function Landing({ configurationError }: { configurationError: string | null }) 
         </div>
         <div className="pricing__grid">
           {tierCards.map((tier) => {
-            const available = products.some((product) => product.slug === tier.slug);
             return (
               <article key={tier.slug} className={'pricing-card ' + (tier.slug === 'sell-in-dms-pro' ? 'pricing-card--featured' : '')}>
                 <div className="pricing-card__top"><span>{tier.label}</span>{tier.slug === 'sell-in-dms-pro' && <b>10% annual saving</b>}</div>
@@ -358,21 +357,21 @@ function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supa
 const checkoutTierCopy: Record<string, { eyebrow: string; heading: string; description: string; points: string[] }> = {
   'sell-in-dms-core': {
     eyebrow: 'SCRIPT LIBRARY',
-    heading: 'Get the scripts for your next conversation.',
-    description: 'Get 100 practical DM reply scripts, a searchable library, and useful sales resources you can use while the conversation is happening.',
-    points: ['100 practical DM reply scripts', 'Searchable customer library', 'Sales resources and guides'],
+    heading: 'The right reply, when you need it.',
+    description: '100 practical DM scripts, organized by real sales situations.',
+    points: ['100 DM reply scripts', 'Searchable library', 'Sales resources'],
   },
   'sell-in-dms-pro': {
     eyebrow: 'SELL IN DMs PRO',
-    heading: 'Turn more conversations into sales.',
-    description: 'Get the full Sell In DMs application with sales-format scripts, AI Reply, and the tools to handle conversations from first message to close.',
-    points: ['Full Sell In DMs application', 'Sales-format scripts', 'AI Reply access'],
+    heading: 'A complete system for selling in DMs.',
+    description: 'Scripts, AI Reply, and the full customer workspace from first message to close.',
+    points: ['Full application', 'Sales-format scripts', 'AI Reply'],
   },
   'sell-in-dms-automation': {
     eyebrow: 'SELL IN DMs AUTOMATION',
-    heading: 'Move from replies to a smarter sales workflow.',
-    description: 'Get everything in Pro plus the Automation tier for the future social-media and marketing reply automation layer.',
-    points: ['Everything in Pro', 'Social-media integration layer', 'Marketing reply automation'],
+    heading: 'Turn replies into a sales workflow.',
+    description: 'Everything in Pro, plus the future automation layer for social and marketing replies.',
+    points: ['Everything in Pro', 'Social integrations', 'Marketing reply automation'],
   },
 };
 
@@ -443,21 +442,21 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
 
   return <PageFrame><div className="checkout-layout"><section className="checkout-intro"><div><span className="eyebrow">{tierCopy.eyebrow}</span><h1>{tierCopy.heading}</h1><p>{tierCopy.description}</p></div><div className="checkout-points">{tierCopy.points.map((point) => <span key={point}>✓ {point}</span>)}</div></section><section className="checkout-card">
         <div className="checkout-card__product">
-          <div><span>PRODUCT</span><h2>{displayProductName}</h2></div>
+          <div><span>YOUR PLAN</span><h2>{displayProductName}</h2></div>
           <strong>{product ? formatProductPrice(product) : '—'}</strong>
         </div>
         {product && (
           <div className="checkout-card__summary">
             <div>
-              <span className="checkout-card__summary-label">WHAT YOU GET</span>
+              <span className="checkout-card__summary-label">INCLUDED</span>
               <ul className="checkout-card__benefits">
                 {tierCopy.points.map((point) => <li key={point}>✓ {point}</li>)}
               </ul>
             </div>
             <div className="checkout-card__billing">
-              <span>CHARGE TODAY</span>
+              <span>PAYMENT</span>
               <strong>{formatProductPrice(product)}</strong>
-              <small>{requestedProduct === 'sell-in-dms-core' ? 'One-time payment' : requestedProduct === 'sell-in-dms-pro' ? '$29/mo equivalent · billed annually' : '$49/mo equivalent · billed annually'}</small>
+              <small>{requestedProduct === 'sell-in-dms-core' ? 'One-time access' : requestedProduct === 'sell-in-dms-pro' ? 'Annual billing · $29/mo equivalent' : 'Annual billing · $49/mo equivalent'}</small>
             </div>
           </div>
         )}
@@ -466,13 +465,12 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
         <form onSubmit={startPayment}>
           <div className="checkout-card__heading">
             <span>01</span>
-            <div><p>SECURE CHECKOUT</p><h2>{user ? 'Ready to pay securely' : 'Enter your details to continue'}</h2></div>
+            <div><p>SECURE CHECKOUT</p><h2>Enter your details</h2></div>
           </div>
           <label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label>
           <label className="field-label">Email<input required type="email" value={user?.email || email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com" /></label>
-          <div className="payment-method"><div><b>PAY</b><span><strong>Paystack</strong><small>Secure payment</small></span></div><i>Selected</i></div>
-          <button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Connecting to Paystack…' : 'Pay ' + (product ? formatProductPrice(product) : '')} <span>→</span></button>
-          <p className="checkout-card__legal">You do not need an account before paying. After payment, use this same email to receive a secure sign-in link and unlock your verified access.</p>
+          <button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Preparing checkout…' : 'Continue to payment'} <span>→</span></button>
+          <p className="checkout-card__legal">No account needed before payment. We&apos;ll use this email for secure access after your purchase.</p>
           {error && <div className="form-error">{error}</div>}
           {user && <button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout?product=' + encodeURIComponent(requestedProduct)); }}>Use a different account</button>}
         </form>
