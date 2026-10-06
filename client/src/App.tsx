@@ -444,7 +444,6 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
   return <PageFrame><div className="checkout-layout"><section className="checkout-intro"><div><span className="eyebrow">{tierCopy.eyebrow}</span><h1>{tierCopy.heading}</h1><p>{tierCopy.description}</p></div><div className="checkout-points">{tierCopy.points.map((point) => <span key={point}>✓ {point}</span>)}</div></section><section className="checkout-card">
         <div className="checkout-card__product">
           <div><span>YOUR PLAN</span><h2>{displayProductName}</h2></div>
-          <strong>{product ? formatProductPrice(product) : '—'}</strong>
         </div>
         {product && (
           <div className="checkout-card__summary">
@@ -456,18 +455,19 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
             </div>
             {product.productType === 'subscription' ? (
               <div className="checkout-card__billing">
-                <span>CHOOSE YOUR BILLING</span>
+                <span>BILLING</span>
                 <div className="billing-toggle" role="group" aria-label="Billing frequency">
-                  <button type="button" className={billingInterval === 'monthly' ? 'is-active' : ''} onClick={() => setBillingInterval('monthly')}>
+                  <button type="button" className={billingInterval === 'monthly' ? 'is-active' : ''} aria-pressed={billingInterval === 'monthly'} onClick={() => setBillingInterval('monthly')}>
+                    <span>Monthly</span>
                     <strong>{requestedProduct === 'sell-in-dms-pro' ? '$29/mo' : '$49/mo'}</strong>
-                    <small>Monthly</small>
                   </button>
-                  <button type="button" className={billingInterval === 'annually' ? 'is-active' : ''} onClick={() => setBillingInterval('annually')}>
+                  <button type="button" className={billingInterval === 'annually' ? 'is-active' : ''} aria-pressed={billingInterval === 'annually'} onClick={() => setBillingInterval('annually')}>
+                    <span>Annual</span>
                     <strong>{formatProductPrice(product)}</strong>
-                    <small>Annual · save 10%</small>
+                    <small>Save 10%</small>
                   </button>
                 </div>
-                <p className="billing-note">Start monthly for the simplest way to stay flexible. Choose annual if you want the 10% saving.</p>
+                <p className="billing-note">Choose monthly for flexibility or annual to save 10%.</p>
               </div>
             ) : (
               <div className="checkout-card__billing">
