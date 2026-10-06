@@ -17,35 +17,46 @@ const subunit=(n:number|string)=>{const v=Number(n);if(!Number.isFinite(v)||v<=0
 export const createPaymentReference=()=> 'sidm_'+crypto.randomUUID().replaceAll('-','');
 
 type PaystackPlan={code:string;name:string;amount:number;currency:string;interval:string};
+export type BillingInterval='monthly'|'annually';
 const planCache=new Map<string,string>();
-const subscriptionPlanConfig=(product:ProductRecord)=>{
-  if(product.slug==='sell-in-dms-pro') return {name:'Sell In DMs Pro Annual',description:'Sell In DMs Pro annual subscription'};
-  if(product.slug==='sell-in-dms-automation') return {name:'Sell In DMs Automation Annual',description:'Sell In DMs Automation annual subscription'};
+const subscriptionPlanConfig=(product:ProductRecord, billingInterval:BillingInterval)=>{
+  if(product.slug==='sell-in-dms-pro') return billingInterval==='monthly'
+    ? {name:'Sell In DMs Pro Monthly',amount:29,interval:'monthly',description:'Sell In DMs Pro monthly subscription'}
+    : {name:'Sell In DMs Pro Annual',amount:Number(product.price),interval:'annually',description:'Sell In DMs Pro annual subscription'};
+  if(product.slug==='sell-in-dms-automation') return billingInterval==='monthly'
+    ? {name:'Sell In DMs Automation Monthly',amount:49,interval:'monthly',description:'Sell In DMs Automation monthly subscription'}
+    : {name:'Sell In DMs Automation Annual',amount:Number(product.price),interval:'annually',description:'Sell In DMs Automation annual subscription'};
   return null;
 };
-export const ensurePaystackPlan=async(product:ProductRecord)=>{
+export const getSubscriptionPricing=(product:ProductRecord,billingInterval:BillingInterval)=>{
+  if(product.product_type!=='subscription') return null;
+  const config=subscriptionPlanConfig(product,billingInterval);
+  if(!config || !Number.isFinite(config.amount) || config.amount<=0) throw new Error('Unsupported Sell In DMs subscription product: '+product.slug);
+  return {amount:config.amount,currency:String(product.currency).toUpperCase(),interval:billingInterval};
+};
+export const ensurePaystackPlan=async(product:ProductRecord,billingInterval:BillingInterval)=>{
   if(product.product_type!=='subscription') return undefined;
-  const config=subscriptionPlanConfig(product);
-  if(!config) throw new Error(`Unsupported Sell In DMs subscription product: ${product.slug}`);
-  const amount=subunit(product.price);
+  const config=subscriptionPlanConfig(product,billingInterval);
+  if(!config) throw new Error('Unsupported Sell In DMs subscription product: '+product.slug);
+  const amount=subunit(config.amount);
   const currency=String(product.currency).toUpperCase();
-  const cacheKey=`${product.slug}:${currency}:${amount}`;
+  const cacheKey=product.slug+':'+currency+':'+billingInterval+':'+amount;
   const cached=planCache.get(cacheKey);
   if(cached) return cached;
   const plans=await api<PaystackPlan[]>('/plan?perPage=100');
-  const existing=plans.find(p=>p.name===config.name&&Number(p.amount)===amount&&String(p.currency).toUpperCase()===currency&&String(p.interval).toLowerCase()==='annually');
+  const existing=plans.find(p=>p.name===config.name&&Number(p.amount)===amount&&String(p.currency).toUpperCase()===currency&&String(p.interval).toLowerCase()===config.interval);
   if(existing?.code){planCache.set(cacheKey,existing.code);return existing.code;}
-  const created=await api<PaystackPlan>('/plan',{method:'POST',body:JSON.stringify({name:config.name,amount,currency,interval:'annually',description:config.description,send_sms:false,send_invoices:true})});
+  const created=await api<PaystackPlan>('/plan',{method:'POST',body:JSON.stringify({name:config.name,amount,currency,interval:config.interval,description:config.description,send_sms:false,send_invoices:true})});
   if(!created?.code) throw new Error('Paystack created the subscription plan without returning a plan code.');
   planCache.set(cacheKey,created.code);
   return created.code;
 };
-export const initializeFlutterwavePayment=async(i:{reference:string;product:ProductRecord;userId:string;email:string;fullName:string;redirectUrl:string})=>{
- const body:any={email:i.email,amount:String(subunit(i.product.price)),currency:i.product.currency,reference:i.reference,callback_url:i.redirectUrl,metadata:{user_id:i.userId,product_id:i.product.id,product_slug:i.product.slug}};
- if(i.product.product_type==='subscription'){
-  body.plan=await ensurePaystackPlan(i.product);
- }
- return (await api<{authorization_url:string}>('/transaction/initialize',{method:'POST',body:JSON.stringify(body)})).authorization_url;
+export const initializeFlutterwavePayment=async(i:{reference:string;product:ProductRecord;userId:string;email:string;fullName:string;redirectUrl:string;billingInterval?:BillingInterval})=>{
+ const billingInterval=i.product.product_type==='subscription'?(i.billingInterval??'monthly'):undefined;
+ const subscriptionPricing=billingInterval?getSubscriptionPricing(i.product,billingInterval):null;
+ const body:any={email:i.email,amount:String(subunit(subscriptionPricing?.amount??i.product.price)),currency:subscriptionPricing?.currency??i.product.currency,reference:i.reference,callback_url:i.redirectUrl,metadata:{user_id:i.userId,product_id:i.product.id,product_slug:i.product.slug,billing_interval:billingInterval??'one_time'}};
+ if(billingInterval) body.plan=await ensurePaystackPlan(i.product,billingInterval);
+ return {authorizationUrl:(await api<{authorization_url:string}>('/transaction/initialize',{method:'POST',body:JSON.stringify(body)})).authorization_url,billingInterval};
 };
 export const verifyFlutterwaveTransaction=async(ref:string):Promise<VerifiedTransaction>=>{
  const d=await api<{id:number|string;status:string;amount:number;currency:string;reference:string}>('/transaction/verify/'+encodeURIComponent(ref));

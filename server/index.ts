@@ -29,6 +29,8 @@ import {
   verifyFlutterwaveTransaction,
   verifyFlutterwaveRefund,
   type ProductRecord,
+  type BillingInterval,
+  getSubscriptionPricing,
 } from './services/flutterwave.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -540,15 +542,21 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   if (profileError) throw profileError;
 
   const paymentProduct = localizeProductForCountry(product, req.header('x-vercel-ip-country'));
+  const requestedBillingInterval = req.body?.billingInterval === 'annually' ? 'annually' : 'monthly';
+  const billingInterval: BillingInterval = paymentProduct.product_type === 'subscription' ? requestedBillingInterval : 'annually';
+  const subscriptionPricing = getSubscriptionPricing(paymentProduct, billingInterval);
+  const chargeAmount = subscriptionPricing?.amount ?? Number(paymentProduct.price);
+  const chargeCurrency = subscriptionPricing?.currency ?? String(paymentProduct.currency).toUpperCase();
   const reference = createPaymentReference();
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
       user_id: user.id,
       product_id: paymentProduct.id,
-      amount: Number(paymentProduct.price),
-      currency: paymentProduct.currency,
+      amount: chargeAmount,
+      currency: chargeCurrency,
       status: 'pending',
+      billing_interval: paymentProduct.product_type === 'subscription' ? billingInterval : null,
       flutterwave_reference: reference,
     })
     .select('id')
@@ -562,9 +570,9 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
       userId: user.id,
       email: paymentEmail,
       fullName,
-      redirectUrl: `${safeAppOrigin()}/api/payments/flutterwave/callback`,
+      redirectUrl: safeAppOrigin() + '/api/payments/flutterwave/callback',
     });
-    return res.status(201).json({ paymentUrl, reference, orderId: order.id });
+    return res.status(201).json({ paymentUrl: paymentUrl.authorizationUrl, reference, orderId: order.id, billingInterval: paymentUrl.billingInterval });
   } catch (error) {
     await admin.from('orders').update({ status: 'failed' }).eq('id', order.id).eq('status', 'pending');
     throw error;
@@ -572,18 +580,17 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/payments/flutterwave/callback', asyncRoute(async (req, res) => {
+  const reference = [req.query.reference, req.query.trxref, req.query.tx_ref].find((value): value is string => typeof value === 'string' && Boolean(value.trim()));
   const transactionId = typeof req.query.transaction_id === 'string' ? req.query.transaction_id : undefined;
-  const reference = typeof req.query.tx_ref === 'string' ? req.query.tx_ref : undefined;
-  if (!transactionId) {
-    return res.redirect(toPaymentStatusPath(false, reference));
-  }
+  const verificationReference = reference || transactionId;
+  if (!verificationReference) return res.redirect(toPaymentStatusPath(false));
 
   try {
-    const verifiedTransaction = await verifyFlutterwaveTransaction(transactionId);
+    const verifiedTransaction = await verifyFlutterwaveTransaction(verificationReference);
     await fulfillVerifiedTransaction(verifiedTransaction);
     return res.redirect(toPaymentStatusPath(true, verifiedTransaction.tx_ref));
   } catch {
-    return res.redirect(toPaymentStatusPath(false, reference));
+    return res.redirect(toPaymentStatusPath(false, reference || transactionId));
   }
 }));
 

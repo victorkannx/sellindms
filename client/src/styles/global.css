@@ -1376,3 +1376,12 @@ button, input { font-weight: 500; }
   .pricing-card__price { margin: 18px 0; padding: 16px 0; }
   .pricing-card ul { gap: 8px; margin-bottom: 20px; font-size: 13px; }
 }
+
+.billing-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.billing-toggle button{appearance:none;border:1px solid var(--line,#d9d5cb);background:transparent;border-radius:12px;padding:13px 12px;text-align:left;color:inherit;cursor:pointer}
+.billing-toggle button.is-active{border-color:#c99047;background:#f7f0e5}
+.billing-toggle strong,.billing-toggle small{display:block}
+.billing-toggle strong{font-size:16px}
+.billing-toggle small{margin-top:4px;color:#77736b}
+.billing-note{margin:10px 0 0;color:#77736b;font-size:13px;line-height:1.5}
+@media (max-width:600px){.billing-toggle{grid-template-columns:1fr}.billing-toggle button{padding:12px}}

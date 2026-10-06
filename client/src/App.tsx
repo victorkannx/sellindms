@@ -384,6 +384,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annually'>('monthly');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     getPublicProduct(requestedProduct).then(setProduct).catch((reason) => setProductError(reason instanceof Error ? reason.message : 'Product information is unavailable.'));
@@ -418,7 +419,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
       const response = await fetch('/api/checkout/flutterwave', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ fullName: fullName.trim(), email: paymentEmail, productSlug: requestedProduct }),
+        body: JSON.stringify({ fullName: fullName.trim(), email: paymentEmail, productSlug: requestedProduct, billingInterval }),
       });
       if (!response.ok) await apiError(response);
       const body = await response.json() as { paymentUrl: string };
@@ -453,11 +454,28 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
                 {tierCopy.points.map((point) => <li key={point}>✓ {point}</li>)}
               </ul>
             </div>
-            <div className="checkout-card__billing">
-              <span>PAYMENT</span>
-              <strong>{formatProductPrice(product)}</strong>
-              <small>{requestedProduct === 'sell-in-dms-core' ? 'One-time access' : requestedProduct === 'sell-in-dms-pro' ? 'Annual billing · $29/mo equivalent' : 'Annual billing · $49/mo equivalent'}</small>
-            </div>
+            {product.productType === 'subscription' ? (
+              <div className="checkout-card__billing">
+                <span>CHOOSE YOUR BILLING</span>
+                <div className="billing-toggle" role="group" aria-label="Billing frequency">
+                  <button type="button" className={billingInterval === 'monthly' ? 'is-active' : ''} onClick={() => setBillingInterval('monthly')}>
+                    <strong>{requestedProduct === 'sell-in-dms-pro' ? '$29/mo' : '$49/mo'}</strong>
+                    <small>Monthly</small>
+                  </button>
+                  <button type="button" className={billingInterval === 'annually' ? 'is-active' : ''} onClick={() => setBillingInterval('annually')}>
+                    <strong>{formatProductPrice(product)}</strong>
+                    <small>Annual · save 10%</small>
+                  </button>
+                </div>
+                <p className="billing-note">Start monthly. You can change your plan or billing preference later.</p>
+              </div>
+            ) : (
+              <div className="checkout-card__billing">
+                <span>PAYMENT</span>
+                <strong>{formatProductPrice(product)}</strong>
+                <small>One-time access</small>
+              </div>
+            )}
           </div>
         )}
         {(productError || configurationError) && <div className="checkout-status" role="status">
@@ -476,7 +494,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
           <label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label>
           <label className="field-label">Email<input required type="email" value={user?.email || email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com" /></label>
           <button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Preparing checkout…' : 'Continue to payment'} <span>→</span></button>
-          <p className="checkout-card__legal">No account is needed before payment. We use your email to match the verified purchase to your Sell In DMs access.</p>
+          <p className="checkout-card__legal">No account is needed before payment. We use your email to match the verified purchase to your Sell In DMs access. Subscription customers can cancel, upgrade, or downgrade from their account.</p>
           {error && <div className="form-error">{error}</div>}
           {user && <button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout?product=' + encodeURIComponent(requestedProduct)); }}>Use a different account</button>}
         </form>
