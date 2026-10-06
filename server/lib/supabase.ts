@@ -1,4 +1,6 @@
-import { createClient, type User } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+
+type User = { id: string; email?: string | null; user_metadata?: Record<string, unknown> };
 import { requireConfig, runtimeConfig } from './config.js';
 
 export const getAdminClient = () =>

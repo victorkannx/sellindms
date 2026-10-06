@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type User = { id: string; email?: string | null; user_metadata?: Record<string, unknown> };
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppSidebar, Brand, Chip, EmptyState, formatNaira, LoadingState, MobileNav, ScriptCard, SearchForm } from './components/ui';
 

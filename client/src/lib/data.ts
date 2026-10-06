@@ -1,4 +1,6 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type User = { id: string; email?: string | null; user_metadata?: Record<string, unknown> };
 import type { AiReplySession, BusinessContext, BusinessContextInput, Entitlement, Offer, OfferInput, Product, Resource, ResourceGuide, Script, Taxonomy } from '../types/domain';
 
 const scriptFields = `
@@ -152,9 +154,9 @@ export const getTaxonomy = async (supabase: SupabaseClient) => {
   ]);
   if (stages.error || categories.error || niches.error) throw new Error(getErrorMessage(stages.error || categories.error || niches.error));
   return {
-    stages: (stages.data ?? []).map((row) => taxonomyFrom(row as Record<string, unknown>)!).filter(Boolean),
-    categories: (categories.data ?? []).map((row) => taxonomyFrom(row as Record<string, unknown>)!).filter(Boolean),
-    niches: (niches.data ?? []).map((row) => taxonomyFrom(row as Record<string, unknown>)!).filter(Boolean),
+    stages: (stages.data ?? []).map((row: any) => taxonomyFrom(row as Record<string, unknown>)!).filter(Boolean),
+    categories: (categories.data ?? []).map((row: any) => taxonomyFrom(row as Record<string, unknown>)!).filter(Boolean),
+    niches: (niches.data ?? []).map((row: any) => taxonomyFrom(row as Record<string, unknown>)!).filter(Boolean),
   };
 };
 
@@ -169,11 +171,11 @@ export const searchScripts = async (supabase: SupabaseClient, query: string, lim
   if (!trimmed) return listScripts(supabase, { limit });
   const { data: matches, error: searchError } = await supabase.rpc('search_scripts', { query_text: trimmed, result_limit: Math.min(limit, 50) });
   if (searchError) throw searchError;
-  const ids: string[] = ((matches ?? []) as Array<{ id: string }>).map((script) => script.id);
+  const ids: string[] = ((matches ?? []) as Array<{ id: string }>).map((script: any) => script.id);
   if (!ids.length) return [];
   const { data, error } = await supabase.from('scripts').select(scriptFields).in('id', ids).eq('status', 'published');
   if (error) throw error;
-  const keyed = new Map((data ?? []).map((item) => [item.id, normalizeScript(item)]));
+  const keyed = new Map((data ?? []).map((item: any) => [item.id, normalizeScript(item)]));
   return ids.map((id) => keyed.get(id)).filter((item): item is Script => Boolean(item));
 };
 
@@ -185,7 +187,7 @@ export const listScripts = async (supabase: SupabaseClient, input: { limit?: num
   if (input.nicheId) {
     const { data: pairs, error: pairError } = await supabase.from('script_niches').select('script_id').eq('niche_id', input.nicheId);
     if (pairError) throw pairError;
-    const ids = (pairs ?? []).map((pair) => pair.script_id);
+    const ids = (pairs ?? []).map((pair: any) => pair.script_id);
     if (!ids.length) return [];
     query = query.in('id', ids);
   }
@@ -201,11 +203,11 @@ export const getRelatedScripts = async (supabase: SupabaseClient, scriptId: stri
     .eq('script_id', scriptId)
     .order('sort_order');
   if (error) throw error;
-  const ids = (relations ?? []).map((relation) => relation.related_script_id);
+  const ids = (relations ?? []).map((relation: any) => relation.related_script_id);
   if (!ids.length) return [];
   const { data, error: scriptsError } = await supabase.from('scripts').select(scriptFields).in('id', ids).eq('status', 'published');
   if (scriptsError) throw scriptsError;
-  const keyed = new Map((data ?? []).map((item) => [item.id, normalizeScript(item)]));
+  const keyed = new Map((data ?? []).map((item: any) => [item.id, normalizeScript(item)]));
   return ids.map((id) => keyed.get(id)).filter((item): item is Script => Boolean(item));
 };
 
@@ -213,7 +215,7 @@ export const getScriptsByIds = async (supabase: SupabaseClient, ids: string[]) =
   if (!ids.length) return [];
   const { data, error } = await supabase.from('scripts').select(scriptFields).in('id', ids).eq('status', 'published');
   if (error) throw error;
-  const keyed = new Map((data ?? []).map((item) => [item.id, normalizeScript(item)]));
+  const keyed = new Map((data ?? []).map((item: any) => [item.id, normalizeScript(item)]));
   return ids.map((id) => keyed.get(id)).filter((item): item is Script => Boolean(item));
 };
 
@@ -239,7 +241,7 @@ export const getRecentlyViewed = async (supabase: SupabaseClient) => {
 export const getFavoriteIds = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase.from('favorites').select('script_id');
   if (error) throw error;
-  return new Set((data ?? []).map((row) => row.script_id));
+  return new Set((data ?? []).map((row: any) => row.script_id));
 };
 
 export const toggleFavorite = async (supabase: SupabaseClient, user: User, scriptId: string, currentlySaved: boolean) => {
