@@ -119,7 +119,7 @@ export const getEntitlement = async (supabase: SupabaseClient): Promise<Entitlem
     slug: item.slug,
     price: item.price,
     currency: item.currency,
-    productType: item.product_type === 'subscription' ? 'one_time' : item.product_type,
+    productType: item.product_type,
   }));
   if (!productList.length) return { active: false, product: null, expiresAt: null };
 

@@ -4,7 +4,7 @@ export type Product = {
   slug: string;
   price: number;
   currency: string;
-  productType: 'one_time';
+  productType: 'one_time' | 'subscription';
 };
 
 export type Taxonomy = {
