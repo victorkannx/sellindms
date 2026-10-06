@@ -467,7 +467,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
                     <small>Annual · save 10%</small>
                   </button>
                 </div>
-                <p className="billing-note">Start monthly. You can change your plan or billing preference later.</p>
+                <p className="billing-note">Start monthly for the simplest way to stay flexible. Choose annual if you want the 10% saving.</p>
               </div>
             ) : (
               <div className="checkout-card__billing">
@@ -494,7 +494,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
           <label className="field-label">Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your full name" /></label>
           <label className="field-label">Email<input required type="email" value={user?.email || email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com" /></label>
           <button disabled={!product || submitting} className="button button--accent button--full" type="submit">{submitting ? 'Preparing checkout…' : 'Continue to payment'} <span>→</span></button>
-          <p className="checkout-card__legal">No account is needed before payment. We use your email to match the verified purchase to your Sell In DMs access. Subscription customers can cancel, upgrade, or downgrade from their account.</p>
+          <p className="checkout-card__legal">No account is needed before payment. We use your email to match the verified purchase to your Sell In DMs access.</p>
           {error && <div className="form-error">{error}</div>}
           {user && <button type="button" className="quiet-button checkout-card__signout" onClick={async () => { await supabase?.auth.signOut(); await refreshEntitlement(); navigate('/checkout?product=' + encodeURIComponent(requestedProduct)); }}>Use a different account</button>}
         </form>
