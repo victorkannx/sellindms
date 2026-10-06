@@ -277,7 +277,7 @@ export const recordCopied = async (supabase: SupabaseClient, user: User, scriptI
 };
 
 export const getResources = async (supabase: SupabaseClient): Promise<Resource[]> => {
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await (supabase.auth as any).getSession();
   if (!sessionData.session?.access_token) throw new Error('Sign in again to access resources.');
   const response = await fetch('/api/resources', { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
   const payload = await response.json().catch(() => null);
@@ -295,7 +295,7 @@ export const getResources = async (supabase: SupabaseClient): Promise<Resource[]
 };
 
 export const getResourceGuide = async (supabase: SupabaseClient, slug: string): Promise<{ resource: Resource; guide: ResourceGuide }> => {
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await (supabase.auth as any).getSession();
   if (!sessionData.session?.access_token) throw new Error('Sign in again to access this resource.');
   const response = await fetch(`/api/resources/${encodeURIComponent(slug)}/content`, { headers: { Authorization: `Bearer ${sessionData.session.access_token}` } });
   const payload = await response.json().catch(() => null);
@@ -422,7 +422,7 @@ export const generateAiReply = async (
   const customerMessage = input.customerMessage.trim();
   if (!customerMessage) throw new Error('Paste the customerâs latest message before continuing.');
 
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await (supabase.auth as any).getSession();
   if (!sessionData.session?.access_token) throw new Error('Sign in again before generating a reply.');
 
   const response = await fetch('/api/ai-replies', {
