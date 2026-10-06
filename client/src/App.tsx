@@ -148,6 +148,12 @@ function App() {
     void refreshEntitlement();
   }, [refreshEntitlement]);
 
+  useEffect(() => {
+    if (!loading && supabase && user && entitlement && !entitlement.active && window.location.pathname !== '/auth/callback') {
+      void supabase.auth.signOut();
+    }
+  }, [loading, supabase, user, entitlement]);
+
   const customerValue = useMemo<CustomerContextValue | null>(() => (
     supabase && user && entitlement ? { supabase, user, entitlement, refreshEntitlement } : null
   ), [supabase, user, entitlement, refreshEntitlement]);
@@ -158,6 +164,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing configurationError={configurationError} />} />
         <Route path="/checkout" element={<Checkout supabase={supabase} user={user} entitlement={entitlement} accessLoading={accessLoading} configurationError={configurationError} refreshEntitlement={refreshEntitlement} />} />
+        <Route path="/signin" element={<SignInPage supabase={supabase} />} />
         <Route path="/payment/success" element={<PaymentResult supabase={supabase} user={user} successful />} />
         <Route path="/payment/failed" element={<PaymentResult supabase={supabase} user={user} successful={false} />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
@@ -340,7 +347,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
   );
 }
 
-function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supabase: SupabaseClient | null; purpose?: string; initialEmail?: string }) {
+function AuthPanel({ supabase, purpose = 'continue', initialEmail = '', shouldCreateUser = false }: { supabase: SupabaseClient | null; purpose?: string; initialEmail?: string; shouldCreateUser?: boolean }) {
   const [email, setEmail] = useState(initialEmail);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -350,7 +357,7 @@ function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supa
     setError(null);
     try {
       const authCallbackUrl = await getAuthCallbackUrl();
-      const { error: authError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: authCallbackUrl, shouldCreateUser: true } });
+      const { error: authError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: authCallbackUrl, shouldCreateUser } });
       if (authError) throw authError;
       setSubmitted(true);
     } catch (reason) {
@@ -359,6 +366,43 @@ function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supa
   };
   if (submitted) return <div className="auth-success"><span>✓</span><h3>Check your inbox.</h3><p>We sent a secure sign-in link to <strong>{email}</strong>. Return here after you open it.</p></div>;
   return <form className="auth-form" onSubmit={submit}><label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label><button className="button button--accent" type="submit">Email me a sign-in link <span>→</span></button><p>Sign in to {purpose}. This does not grant library access—access is verified separately.</p>{error && <div className="form-error">{error}</div>}</form>;
+}
+
+function SignInPage({ supabase }: { supabase: SupabaseClient | null }) {
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState(params.get('email') || '');
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const product = params.get('product') || 'sell-in-dms-core';
+  const billing = params.get('billing') === 'annually' ? 'annually' : 'monthly';
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) return setError('Supabase authentication is not configured yet.');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return setError('Enter your email address.');
+    setError(null);
+    try {
+      sessionStorage.setItem('sellindms_checkout_email', normalizedEmail);
+      sessionStorage.setItem('sellindms_checkout_product', product);
+      sessionStorage.setItem('sellindms_checkout_billing', billing);
+      const authCallbackUrl = await getAuthCallbackUrl();
+      const { error: authError } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: { emailRedirectTo: authCallbackUrl, shouldCreateUser: false },
+      });
+      if (authError) throw authError;
+      setSubmitted(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'We could not send that sign-in link.');
+    }
+  };
+
+  if (submitted) {
+    return <PageFrame><div className="access-message"><span>✓</span><h1>Check your inbox.</h1><p>We sent a secure sign-in link to <strong>{email}</strong>. After you open it, we’ll take you to your Sell In DMs account or back to the plan you selected.</p><Link className="button button--light" to={'/checkout?product=' + encodeURIComponent(product) + '&billing=' + encodeURIComponent(billing)}>Back to checkout <span>→</span></Link></div></PageFrame>;
+  }
+
+  return <PageFrame><div className="access-message"><span>↳</span><h1>Sign in to Sell In DMs.</h1><p>Use the email connected to your account. We’ll send you a secure sign-in link.</p><form className="auth-form" onSubmit={submit}><label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label><button className="button button--accent" type="submit">Email me a sign-in link <span>→</span></button><p>Your account is only given library access when a paid entitlement is active.</p>{error && <div className="form-error">{error}</div>}</form></div></PageFrame>;
 }
 
 const checkoutTierCopy: Record<string, { eyebrow: string; heading: string; description: string; points: string[] }> = {
@@ -391,7 +435,8 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annually'>('monthly');
+  const initialBilling = params.get('billing') === 'annually' ? 'annually' : 'monthly';
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annually'>(initialBilling);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     getPublicProduct(requestedProduct).then(setProduct).catch((reason) => setProductError(reason instanceof Error ? reason.message : 'Product information is unavailable.'));
@@ -417,12 +462,31 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
     setSubmitting(true);
     setError(null);
     try {
+      if (!user) {
+        const statusResponse = await fetch('/api/auth/email-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: paymentEmail }),
+        });
+        if (!statusResponse.ok) await apiError(statusResponse);
+        const accountStatus = await statusResponse.json() as { registered: boolean };
+        if (accountStatus.registered) {
+          sessionStorage.setItem('sellindms_checkout_email', paymentEmail);
+          sessionStorage.setItem('sellindms_checkout_product', requestedProduct);
+          sessionStorage.setItem('sellindms_checkout_billing', billingInterval);
+          navigate('/signin?email=' + encodeURIComponent(paymentEmail) + '&product=' + encodeURIComponent(requestedProduct) + '&billing=' + encodeURIComponent(billingInterval));
+          return;
+        }
+      }
+
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (supabase && user) {
         const { data } = await (supabase.auth as any).getSession();
         if (data.session?.access_token) headers.Authorization = 'Bearer ' + data.session.access_token;
       }
       sessionStorage.setItem('sellindms_checkout_email', paymentEmail);
+      sessionStorage.setItem('sellindms_checkout_product', requestedProduct);
+      sessionStorage.setItem('sellindms_checkout_billing', billingInterval);
       const response = await fetch('/api/checkout/flutterwave', {
         method: 'POST',
         headers,
@@ -555,8 +619,19 @@ function AuthCallback() {
           if (exchangeError) throw exchangeError;
         }
         const { data } = await (supabase.auth as any).getSession();
-        if (data.session) navigate('/checkout', { replace: true });
-        else setError('The sign-in link did not create a session. Request a new link and try again.');
+        if (data.session) {
+          const selectedProduct = sessionStorage.getItem('sellindms_checkout_product') || 'sell-in-dms-core';
+          const selectedBilling = sessionStorage.getItem('sellindms_checkout_billing') === 'annually' ? 'annually' : 'monthly';
+          const entitlement = await getEntitlement(supabase);
+          sessionStorage.removeItem('sellindms_checkout_product');
+          sessionStorage.removeItem('sellindms_checkout_billing');
+          if (entitlement.active) {
+            navigate('/app', { replace: true });
+          } else {
+            await supabase.auth.signOut();
+            navigate('/checkout?product=' + encodeURIComponent(selectedProduct) + '&billing=' + encodeURIComponent(selectedBilling), { replace: true });
+          }
+        } else setError('The sign-in link did not create a session. Request a new link and try again.');
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Authentication could not be completed.');
       }
@@ -567,9 +642,19 @@ function AuthCallback() {
 
 function CustomerGate({ loading, accessLoading, user, entitlement, configurationError, customerValue }: { loading: boolean; accessLoading: boolean; user: User | null; entitlement: Entitlement | null; configurationError: string | null; customerValue: CustomerContextValue | null }) {
   const location = useLocation();
-  if (loading || accessLoading) return <PageFrame><LoadingState label="Checking secure library access" /></PageFrame>;
+  const [removingUnpaidSession, setRemovingUnpaidSession] = useState(false);
+  useEffect(() => {
+    if (!loading && !accessLoading && user && entitlement && !entitlement.active) {
+      setRemovingUnpaidSession(true);
+      void (async () => {
+        await customerValue?.supabase.auth.signOut();
+        setRemovingUnpaidSession(false);
+      })();
+    }
+  }, [loading, accessLoading, user, entitlement, customerValue]);
+  if (loading || accessLoading || removingUnpaidSession) return <PageFrame><LoadingState label="Checking secure library access" /></PageFrame>;
   if (!user) return <Navigate to={`/checkout?next=${encodeURIComponent(location.pathname)}`} replace />;
-  if (!entitlement?.active || !customerValue) return <PageFrame><div className="access-message"><span>↳</span><h1>Access required.</h1><p>{configurationError || 'This signed-in account does not have an active Sell In DMs Core entitlement yet.'}</p><Link className="button button--accent" to="/checkout">Go to checkout <span>→</span></Link></div></PageFrame>;
+  if (!entitlement?.active || !customerValue) return <Navigate to="/checkout" replace />;
   return <CustomerContext.Provider value={customerValue}><CustomerArea /></CustomerContext.Provider>;
 }
 
