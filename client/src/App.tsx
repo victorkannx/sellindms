@@ -195,6 +195,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       name: 'Script Library',
       label: 'START HERE',
       price: '$9',
+      localPrice: '',
       description: '100 practical DM reply scripts plus the resources you need to use them immediately.',
       features: ['100 DM reply scripts', 'Searchable customer library', 'Start Here guide', 'Objection Cheat Sheet', 'Copy and save scripts'],
     },
