@@ -9,9 +9,9 @@ export const runtimeConfig = {
   builtInForgeApiUrl: required('BUILT_IN_FORGE_API_URL'),
   builtInForgeApiKey: required('BUILT_IN_FORGE_API_KEY'),
   aiReplyModel: required('AI_REPLY_MODEL'),
-  flutterwavePublicKey: required('FLUTTERWAVE_PUBLIC_KEY'),
-  flutterwaveSecretKey: required('FLUTTERWAVE_SECRET_KEY'),
-  flutterwaveWebhookSecret: required('FLUTTERWAVE_WEBHOOK_SECRET'),
+  
+  paystackSecretKey: required('PAYSTACK_SECRET_KEY'),
+  
   appOrigin: required('APP_ORIGIN'),
   resourceBucket: required('SUPABASE_RESOURCE_BUCKET'),
 } as const;

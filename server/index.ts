@@ -21,17 +21,17 @@ import {
   isCompletedRefundStatus,
   isRefundWebhookPayload,
   isTerminalChargeFailure,
-  initializeFlutterwavePayment,
+  initializePaystackPayment,
   recordVerifiedTerminalFailure,
   revokeVerifiedRefund,
   secureEqual,
   verifyPaystackWebhookSignature,
-  verifyFlutterwaveTransaction,
-  verifyFlutterwaveRefund,
+  verifyPaystackTransaction,
+  verifyPaystackRefund,
   type ProductRecord,
   type BillingInterval,
   getSubscriptionPricing,
-} from './services/flutterwave.js';
+} from './services/paystack.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -370,7 +370,7 @@ app.post('/api/payments/paystack/webhook', express.raw({ type: 'application/json
   if (payload.event === 'charge.success') {
     const reference = payload?.data?.reference;
     if (!reference) return sendError(res, 400, 'MISSING_REFERENCE', 'The Paystack webhook did not include a transaction reference.');
-    await fulfillVerifiedTransaction(await verifyFlutterwaveTransaction(String(reference)));
+    await fulfillVerifiedTransaction(await verifyPaystackTransaction(String(reference)));
   }
   return res.status(200).json({ received: true });
 }));
@@ -547,7 +547,7 @@ app.post('/api/auth/email-status', asyncRoute(async (req, res) => {
   return res.json({ registered: false });
 }));
 
-app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
+app.post('/api/checkout/paystack', asyncRoute(async (req, res) => {
   const authorization = req.header('authorization');
   const authenticated = authorization ? await authenticatedUser(authorization) : null;
   const submittedEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
@@ -593,20 +593,20 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
       currency: chargeCurrency,
       status: 'pending',
       billing_interval: paymentProduct.product_type === 'subscription' ? billingInterval : null,
-      flutterwave_reference: reference,
+      paystack_reference: reference,
     })
     .select('id')
     .single();
   if (orderError || !order) throw orderError || new Error('The pending order could not be created.');
 
   try {
-    const paymentUrl = await initializeFlutterwavePayment({
+    const paymentUrl = await initializePaystackPayment({
       reference,
       product: paymentProduct,
       userId: user.id,
       email: paymentEmail,
       fullName,
-      redirectUrl: safeAppOrigin() + '/api/payments/flutterwave/callback',
+      redirectUrl: safeAppOrigin() + '/api/payments/paystack/callback',
     });
     return res.status(201).json({ paymentUrl: paymentUrl.authorizationUrl, reference, orderId: order.id, billingInterval: paymentUrl.billingInterval });
   } catch (error) {
@@ -615,14 +615,14 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   }
 }));
 
-app.get('/api/payments/flutterwave/callback', asyncRoute(async (req, res) => {
+app.get('/api/payments/paystack/callback', asyncRoute(async (req, res) => {
   const reference = [req.query.reference, req.query.trxref, req.query.tx_ref].find((value): value is string => typeof value === 'string' && Boolean(value.trim()));
   const transactionId = typeof req.query.transaction_id === 'string' ? req.query.transaction_id : undefined;
   const verificationReference = reference || transactionId;
   if (!verificationReference) return res.redirect(toPaymentStatusPath(false));
 
   try {
-    const verifiedTransaction = await verifyFlutterwaveTransaction(verificationReference);
+    const verifiedTransaction = await verifyPaystackTransaction(verificationReference);
     await fulfillVerifiedTransaction(verifiedTransaction);
     return res.redirect(toPaymentStatusPath(true, verifiedTransaction.tx_ref));
   } catch {
@@ -640,7 +640,7 @@ app.get('/api/payments/status', asyncRoute(async (req, res) => {
   const { data: order, error } = await getAdminClient()
     .from('orders')
     .select('id, status, paid_at, product_id, amount, currency')
-    .eq('flutterwave_reference', reference)
+    .eq('paystack_reference', reference)
     .eq('user_id', user.id)
     .maybeSingle();
   if (error) throw error;

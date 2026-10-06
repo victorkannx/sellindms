@@ -9,7 +9,7 @@ A mobile-first customer application for the existing **Sell In DMs Core** Supaba
 - Relies on existing Supabase RLS for published-script and customer-owned record access.
 - Requires both a Supabase Auth session and active `product_access` entitlement before `/app/*` can display the paid library.
 - Uses the existing `search_scripts(query_text, result_limit)` full-text function for natural-language search.
-- Keeps Flutterwave secrets server-only. Checkout success URLs do not grant access; the server verifies Flutterwave transactions before changing an order to `successful` and upserting the unique `(user_id, product_id)` access row.
+- Keeps Paystack secrets server-only. Checkout success URLs do not grant access; the server verifies Paystack transactions before changing an order to `successful` and upserting the unique `(user_id, product_id)` access row.
 - Generates AI replies only from the authenticated customer’s saved business context, owned active offer, current conversation, and 3–5 results from the existing script search; it never accepts browser-supplied user or context IDs.
 
 ## Required configuration
@@ -25,8 +25,8 @@ Use the secure project secret input flow for these values; do not put them in so
 | `OPENAI_API_BASE` | Optional OpenAI-compatible base URL for AI Reply generation |
 | `BUILT_IN_FORGE_API_URL` / `BUILT_IN_FORGE_API_KEY` | Alternative Manus server-side AI provider pair |
 | `AI_REPLY_MODEL` | Optional server-side AI Reply model override; defaults to `gpt-5-mini` |
-| `FLUTTERWAVE_SECRET_KEY` | Server-only Flutterwave checkout initialization and transaction verification |
-| `FLUTTERWAVE_WEBHOOK_SECRET` | Server-only validation of the Flutterwave `verif-hash` webhook header |
+| `PAYSTACK_SECRET_KEY` | Server-only Paystack checkout initialization, transaction verification, plan management, and webhook signature validation |
+| 
 | `APP_ORIGIN` | Browser-visible HTTPS origin used for the Supabase Auth callback and Flutterwave callback URL |
 | `SUPABASE_RESOURCE_BUCKET` | Required only if an active resource uses `storage_path` instead of `external_url` |
 
@@ -63,9 +63,9 @@ Provider output is treated as untrusted: the server rejects malformed or incompl
 ## Payment flow
 
 1. The customer signs in using Supabase Auth; this links a pending order to an authenticated identity but does not grant library access.
-2. The server creates a pending order for the existing product and initializes Flutterwave checkout.
-3. Flutterwave callback/webhook sends a transaction ID.
-4. The server independently verifies the transaction amount, currency, reference, and successful status with Flutterwave.
+2. The server creates a pending order for the selected product and initializes Paystack checkout.
+3. Paystack callback/webhook sends a transaction reference.
+4. The server independently verifies the transaction amount, currency, reference, and successful status with Paystack.
 5. The server marks the matching order successful and activates/upserts the existing unique `product_access` record.
 6. The browser checks the database-backed entitlement before opening the customer library.
 
