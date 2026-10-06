@@ -89,43 +89,52 @@ export const normalizeScript = (row: Record<string, any>): Script => ({
   sortOrder: row.sort_order ?? null,
 });
 
-export const getPublicProduct = async (): Promise<Product> => {
-  const response = await fetch('/api/public/product');
+export const getPublicProducts = async (): Promise<Product[]> => {
+  const response = await fetch('/api/public/products');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message || 'The product details are unavailable right now.');
+  return payload.products as Product[];
+};
+
+export const getPublicProduct = async (slug = 'sell-in-dms-core'): Promise<Product> => {
+  const response = await fetch('/api/public/product?slug=' + encodeURIComponent(slug));
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new Error(payload?.error?.message || 'The product details are unavailable right now.');
   return payload as Product;
 };
 
 export const getEntitlement = async (supabase: SupabaseClient): Promise<Entitlement> => {
-  const { data: product, error: productError } = await supabase
+  const { data: products, error: productError } = await supabase
     .from('products')
     .select('id, name, slug, price, currency, product_type')
-    .eq('slug', 'sell-in-dms-core')
-    .eq('is_active', true)
-    .maybeSingle();
+    .in('slug', ['sell-in-dms-core', 'sell-in-dms-pro', 'sell-in-dms-automation'])
+    .eq('is_active', true);
   if (productError) throw productError;
-  if (!product) return { active: false, product: null, expiresAt: null };
 
-  const { data: access, error: accessError } = await supabase
+  const productList = (products ?? []) as Product[];
+  if (!productList.length) return { active: false, product: null, expiresAt: null };
+
+  const { data: accesses, error: accessError } = await supabase
     .from('product_access')
-    .select('status, expires_at')
-    .eq('product_id', product.id)
-    .maybeSingle();
+    .select('product_id, status, expires_at')
+    .in('product_id', productList.map((item) => item.id));
   if (accessError) throw accessError;
-  const expired = !!access?.expires_at && new Date(access.expires_at).getTime() <= Date.now();
 
-  return {
-    active: access?.status === 'active' && !expired,
-    product: {
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      price: Number(product.price),
-      currency: product.currency,
-      productType: 'one_time',
-    },
-    expiresAt: access?.expires_at ?? null,
-  };
+  const priority = ['sell-in-dms-automation', 'sell-in-dms-pro', 'sell-in-dms-core'];
+  for (const slug of priority) {
+    const product = productList.find((item) => item.slug === slug);
+    const access = product ? (accesses ?? []).find((item) => item.product_id === product.id) : null;
+    const expired = !!access?.expires_at && new Date(access.expires_at).getTime() <= Date.now();
+    if (product && access?.status === 'active' && !expired) {
+      return {
+        active: true,
+        product,
+        expiresAt: access?.expires_at ?? null,
+      };
+    }
+  }
+
+  return { active: false, product: null, expiresAt: null };
 };
 
 export const getTaxonomy = async (supabase: SupabaseClient) => {
@@ -404,7 +413,7 @@ export const generateAiReply = async (
   input: { customerMessage: string; conversationContext: string; mode: 'quick' | 'full' },
 ): Promise<{ session: AiReplySession; whyThisWorks: string; recommendedScriptCode: string | null }> => {
   const customerMessage = input.customerMessage.trim();
-  if (!customerMessage) throw new Error('Paste the customer’s latest message before continuing.');
+  if (!customerMessage) throw new Error('Paste the customerâs latest message before continuing.');
 
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData.session?.access_token) throw new Error('Sign in again before generating a reply.');

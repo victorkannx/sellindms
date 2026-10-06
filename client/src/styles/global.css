@@ -1063,3 +1063,28 @@ button, input { font-weight: 500; }
   .ai-reply-history__item { grid-template-columns: 1fr; gap: 7px; padding: 18px 4px; }
   .ai-reply-history__item strong { white-space: normal; }
 }
+
+/* Sell In DMs tier pricing */
+.pricing { padding-top: 7rem; padding-bottom: 7rem; }
+.pricing__heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr); gap: 2rem; align-items: end; margin: 1rem 0 2.5rem; }
+.pricing__heading h2 { margin: 0; max-width: 12ch; }
+.pricing__heading p { margin: 0; opacity: .78; line-height: 1.7; }
+.pricing__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: stretch; }
+.pricing-card { display: flex; flex-direction: column; padding: 1.5rem; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.045); min-height: 100%; }
+.pricing-card--featured { border-color: rgba(255,255,255,.55); transform: translateY(-8px); }
+.pricing-card__top { display: flex; justify-content: space-between; gap: .75rem; align-items: center; min-height: 1.25rem; }
+.pricing-card__top span, .pricing-card__top b { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; }
+.pricing-card__top b { opacity: .7; }
+.pricing-card h3 { margin: 1.4rem 0 .7rem; font-size: clamp(1.5rem, 2vw, 2rem); }
+.pricing-card__description { min-height: 5.5rem; line-height: 1.65; opacity: .78; }
+.pricing-card__price { display: flex; flex-direction: column; gap: .2rem; margin: 1.2rem 0; padding: 1rem 0; border-top: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12); }
+.pricing-card__price strong { font-size: 2rem; letter-spacing: -.03em; }
+.pricing-card__price small { opacity: .65; }
+.pricing-card ul { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: .65rem; line-height: 1.45; font-size: .92rem; opacity: .88; }
+.pricing-card .button { margin-top: auto; }
+@media (max-width: 900px) {
+  .pricing__heading { grid-template-columns: 1fr; }
+  .pricing__grid { grid-template-columns: 1fr; }
+  .pricing-card--featured { transform: none; }
+  .pricing-card__description { min-height: auto; }
+}

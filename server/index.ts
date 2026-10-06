@@ -68,7 +68,7 @@ const readAiReplyInput = (body: unknown): AiReplyRequestInput => {
   const conversationContext = asOptionalText(request.conversationContext);
   const mode = request.mode === 'full' ? 'full' : 'quick';
 
-  if (!customerMessage) throw new AiReplyInputError('Paste the customer’s latest message before continuing.');
+  if (!customerMessage) throw new AiReplyInputError('Paste the customerâs latest message before continuing.');
   if (customerMessage.length > 20_000 || (conversationContext?.length || 0) > 20_000) {
     throw new AiReplyInputError('Keep each conversation field under 20,000 characters.');
   }
@@ -183,18 +183,24 @@ const isRecentMatchingAiReplySession = (
     && row.offer_id === offerId;
 };
 
-const getCoreProduct = async (): Promise<ProductRecord> => {
+const SELL_IN_DMS_PRODUCT_SLUGS = ['sell-in-dms-core', 'sell-in-dms-pro', 'sell-in-dms-automation'] as const;
+
+const getProductBySlug = async (slug: string): Promise<ProductRecord> => {
+  if (!SELL_IN_DMS_PRODUCT_SLUGS.includes(slug as typeof SELL_IN_DMS_PRODUCT_SLUGS[number])) {
+    throw new Error('Unsupported Sell In DMs product.');
+  }
   const { data, error } = await getAdminClient()
     .from('products')
-    .select('id, name, slug, price, currency, is_active')
-    .eq('slug', 'sell-in-dms-core')
+    .select('id, name, slug, price, currency, is_active, product_type')
+    .eq('slug', slug)
     .eq('is_active', true)
     .maybeSingle();
-
   if (error) throw error;
-  if (!data) throw new Error('The active Sell In DMs Core product could not be found.');
+  if (!data) throw new Error('The active Sell In DMs product could not be found.');
   return data as ProductRecord;
 };
+
+const getCoreProduct = async (): Promise<ProductRecord> => getProductBySlug('sell-in-dms-core');
 
 const accessForUser = async (userId: string) => {
   const product = await getCoreProduct();
@@ -208,11 +214,33 @@ const accessForUser = async (userId: string) => {
   return { product, access: data };
 };
 
+const accessForProduct = async (userId: string, slug: string) => {
+  const product = await getProductBySlug(slug);
+  const { data, error } = await getAdminClient()
+    .from('product_access')
+    .select('id, status, expires_at, granted_at')
+    .eq('user_id', userId)
+    .eq('product_id', product.id)
+    .maybeSingle();
+  if (error) throw error;
+  return { product, access: data };
+};
+
+const sellInDmsAccessForUser = async (userId: string) => {
+  const { data, error } = await getAdminClient()
+    .from('product_access')
+    .select('id, status, expires_at, granted_at, products!inner(slug, is_active)')
+    .eq('user_id', userId)
+    .in('products.slug', [...SELL_IN_DMS_PRODUCT_SLUGS])
+    .eq('products.is_active', true);
+  if (error) throw error;
+  return (data ?? []).find((row: any) => isActiveAccess(row)) ?? null;
+};
+
 const activeCustomer = async (authorization: string | undefined, res: Response) => {
   const user = await authenticatedUser(authorization);
-  const { access } = await accessForUser(user.id);
-  if (!isActiveAccess(access)) {
-    sendError(res, 403, 'ACCESS_REQUIRED', 'An active Sell In DMs Core entitlement is required to access resources.');
+  if (!(await sellInDmsAccessForUser(user.id))) {
+    sendError(res, 403, 'ACCESS_REQUIRED', 'An active Sell In DMs entitlement is required to access resources.');
     return null;
   }
   return user;
@@ -242,15 +270,35 @@ app.get('/api/public/config', (_req, res) => {
   return res.json(config);
 });
 
-app.get('/api/public/product', asyncRoute(async (_req, res) => {
-  const product = await getCoreProduct();
+app.get('/api/public/products', asyncRoute(async (_req, res) => {
+  const { data, error } = await getAdminClient()
+    .from('products')
+    .select('id, name, slug, price, currency, product_type')
+    .in('slug', [...SELL_IN_DMS_PRODUCT_SLUGS])
+    .eq('is_active', true);
+  if (error) throw error;
+  res.json({
+    products: (data ?? []).map((product: any) => ({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: Number(product.price),
+      currency: product.currency,
+      productType: product.product_type,
+    })),
+  });
+}));
+
+app.get('/api/public/product', asyncRoute(async (req, res) => {
+  const slug = typeof req.query.slug === 'string' ? req.query.slug : 'sell-in-dms-core';
+  const product = await getProductBySlug(slug);
   res.json({
     id: product.id,
     name: product.name,
     slug: product.slug,
     price: Number(product.price),
     currency: product.currency,
-    productType: 'one_time',
+    productType: product.product_type ?? 'one_time',
   });
 }));
 
@@ -416,9 +464,10 @@ app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
     return sendError(res, 400, 'NAME_REQUIRED', 'Enter your full name before continuing to payment.');
   }
 
-  const { product, access } = await accessForUser(user.id);
+  const productSlug = typeof req.body?.productSlug === 'string' ? req.body.productSlug.trim() : 'sell-in-dms-core';
+  const { product, access } = await accessForProduct(user.id, productSlug);
   if (isActiveAccess(access)) {
-    return sendError(res, 409, 'ALREADY_ENTITLED', 'This account already has access to Sell In DMs Core.');
+    return sendError(res, 409, 'ALREADY_ENTITLED', 'This account already has access to ' + product.name + '.');
   }
 
   const admin = getAdminClient();
@@ -492,7 +541,13 @@ app.get('/api/payments/status', asyncRoute(async (req, res) => {
   if (error) throw error;
   if (!order) return sendError(res, 404, 'ORDER_NOT_FOUND', 'This payment could not be found for the signed-in account.');
 
-  const { access } = await accessForUser(user.id);
+  const { data: access, error: accessError } = await getAdminClient()
+    .from('product_access')
+    .select('id, status, expires_at, granted_at')
+    .eq('user_id', user.id)
+    .eq('product_id', order.product_id)
+    .maybeSingle();
+  if (accessError) throw accessError;
   return res.json({
     status: order.status,
     paidAt: order.paid_at,
@@ -504,9 +559,9 @@ app.get('/api/payments/status', asyncRoute(async (req, res) => {
 
 app.get('/api/resources/:slug/download', asyncRoute(async (req, res) => {
   const user = await authenticatedUser(req.header('authorization'));
-  const { access } = await accessForUser(user.id);
-  if (!isActiveAccess(access)) {
-    return sendError(res, 403, 'ACCESS_REQUIRED', 'An active Sell In DMs Core entitlement is required to download resources.');
+  const access = await sellInDmsAccessForUser(user.id);
+  if (!access) {
+    return sendError(res, 403, 'ACCESS_REQUIRED', 'An active Sell In DMs entitlement is required to download resources.');
   }
 
   const { data: resource, error } = await getAdminClient()
