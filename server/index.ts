@@ -2,7 +2,6 @@ import path from 'node:path';
 import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { createServer as createViteServer } from 'vite';
 import { publicSupabaseConfig, requireConfig, runtimeConfig, safeAppOrigin } from './lib/config.js';
 import { authenticatedUser, getAdminClient, isActiveAccess } from './lib/supabase.js';
 import {
@@ -672,6 +671,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 const start = async () => {
   const httpServer = createHttpServer(app);
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       root: path.join(projectRoot, 'client'),
       server: { middlewareMode: true, allowedHosts: true, hmr: { server: httpServer } },
