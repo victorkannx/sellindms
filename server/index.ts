@@ -202,9 +202,27 @@ const getProductBySlug = async (slug: string): Promise<ProductRecord> => {
 };
 
 
-const localizeProductForCountry = (product: ProductRecord, country: string | undefined): ProductRecord => {
-  if (String(country || '').toUpperCase() === 'NG' && product.slug === 'sell-in-dms-core') {
-    return { ...product, price: 7500, currency: 'NGN' };
+type LocalizedProductRecord = ProductRecord & {
+  monthlyPrice?: number;
+  annualPrice?: number;
+};
+
+const getPaystackCurrencyForCountry = (_country: string | undefined): 'NGN' => {
+  // The current Paystack merchant configuration is enabled for NGN.
+  // Customers only see currencies we can actually charge.
+  return 'NGN';
+};
+
+const localizeProductForCountry = (product: ProductRecord, country: string | undefined): LocalizedProductRecord => {
+  const currency = getPaystackCurrencyForCountry(country);
+  if (product.slug === 'sell-in-dms-core') {
+    return { ...product, price: 7500, currency };
+  }
+  if (product.slug === 'sell-in-dms-pro') {
+    return { ...product, price: 415800, currency, monthlyPrice: 38500, annualPrice: 415800 };
+  }
+  if (product.slug === 'sell-in-dms-automation') {
+    return { ...product, price: 702000, currency, monthlyPrice: 65000, annualPrice: 702000 };
   }
   return product;
 };
@@ -306,6 +324,8 @@ app.get('/api/public/products', asyncRoute(async (req, res) => {
           price: Number(localized.price),
           currency: localized.currency,
           productType: localized.product_type,
+          monthlyPrice: localized.monthlyPrice,
+          annualPrice: localized.annualPrice,
         };
       }),
     });
@@ -337,6 +357,8 @@ app.get('/api/public/product', asyncRoute(async (req, res) => {
     price: Number(product.price),
     currency: product.currency,
     productType: product.product_type ?? 'one_time',
+    monthlyPrice: (product as LocalizedProductRecord).monthlyPrice,
+    annualPrice: (product as LocalizedProductRecord).annualPrice,
   });
 }));
 
