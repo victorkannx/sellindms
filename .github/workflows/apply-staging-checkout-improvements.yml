@@ -12,65 +12,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {ref: vercel-compatibility, fetch-depth: 0}
-      - name: Patch staging UI and checkout
+      - name: Apply targeted staging changes
         run: |
           python3 <<'PY'
           from pathlib import Path
           import re
-
           p=Path("client/src/App.tsx"); s=p.read_text()
           s=s.replace('<Link className="button button--small button--light" to="/#pricing">Get Sell In DMs <span>→</span></Link>','<a className="button button--small button--light" href="#pricing">Get Sell In DMs <span>→</span></a>')
           s=s.replace('<Link className="button button--accent" to="/#pricing">Get Sell In DMs <span>→</span></Link>','<a className="button button--accent" href="#pricing">Get Sell In DMs <span>→</span></a>')
           s=s.replace("const [fullName, setFullName] = useState('');","const [fullName, setFullName] = useState('');\n  const [email, setEmail] = useState('');",1)
           s=s.replace("  useEffect(() => { if (user?.user_metadata?.full_name) setFullName(String(user.user_metadata.full_name)); }, [user]);","  useEffect(() => { if (user?.user_metadata?.full_name) setFullName(String(user.user_metadata.full_name)); if (user?.email) setEmail(user.email); }, [user]);",1)
-
-          pattern=r"  const startPayment = async \(event: FormEvent<HTMLFormElement>\) => \{.*?\n  \};\n\n  const tierCopy"
-          replacement="""  const startPayment = async (event: FormEvent<HTMLFormElement>) => {
+          s,n=re.subn(r"  const startPayment = async \(event: FormEvent<HTMLFormElement>\) => \{.*?\n  \};\n\n  const tierCopy","""  const startPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!product) return;
-    const paymentEmail = (user?.email || email).trim().toLowerCase();
+    const paymentEmail=(user?.email||email).trim().toLowerCase();
     if (!paymentEmail) return setError('Enter the email you want to use for your purchase and access.');
     if (!fullName.trim()) return setError('Enter your full name before continuing to payment.');
     setSubmitting(true); setError(null);
     try {
-      const headers: Record<string,string> = {'Content-Type':'application/json'};
-      if (supabase && user) {
-        const {data} = await (supabase.auth as any).getSession();
-        if (data.session?.access_token) headers.Authorization='Bearer '+data.session.access_token;
-      }
+      const headers: Record<string,string>={'Content-Type':'application/json'};
+      if(supabase&&user){const {data}=await (supabase.auth as any).getSession();if(data.session?.access_token) headers.Authorization='Bearer '+data.session.access_token;}
       sessionStorage.setItem('sellindms_checkout_email',paymentEmail);
       const response=await fetch('/api/checkout/flutterwave',{method:'POST',headers,body:JSON.stringify({fullName:fullName.trim(),email:paymentEmail,productSlug:requestedProduct})});
-      if (!response.ok) await apiError(response);
+      if(!response.ok) await apiError(response);
       const body=await response.json() as {paymentUrl:string};
       window.location.assign(body.paymentUrl);
-    } catch(reason) { setError(reason instanceof Error ? reason.message : 'Payment could not be started.'); }
-    finally { setSubmitting(false); }
+    }catch(reason){setError(reason instanceof Error?reason.message:'Payment could not be started.');}finally{setSubmitting(false);}
   };
 
-  const tierCopy"""
-          s,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+  const tierCopy""",s,count=1,flags=re.S)
           if n!=1: raise SystemExit("checkout handler not found")
-
-          card=r'<section className="checkout-card">.*?</section></div></PageFrame>;'
-          newcard="""<section className="checkout-card">
-        <div className="checkout-card__product"><div><span>PRODUCT</span><h2>{displayProductName}</h2></div><strong>{product ? formatProductPrice(product) : '—'}</strong></div>
-        {product && <div className="checkout-card__summary"><div><span className="checkout-card__summary-label">WHAT YOU GET</span><ul className="checkout-card__benefits">{tierCopy.points.map((point)=><li key={point}>✓ {point}</li>)}</ul></div><div className="checkout-card__billing"><span>CHARGE TODAY</span><strong>{formatProductPrice(product)}</strong><small>{requestedProduct==='sell-in-dms-core'?'One-time payment':requestedProduct==='sell-in-dms-pro'?'$29/mo equivalent · billed annually':'$49/mo equivalent · billed annually'}</small></div></div>}
-        {productError && <div className="form-error">{productError}</div>}
-        {configurationError && <div className="form-error">{configurationError}</div>}
+          s,n=re.subn(r'<section className="checkout-card">.*?</section></div></PageFrame>;',"""<section className="checkout-card">
+        <div className="checkout-card__product"><div><span>PRODUCT</span><h2>{displayProductName}</h2></div><strong>{product?formatProductPrice(product):'—'}</strong></div>
+        {product&&<div className="checkout-card__summary"><div><span className="checkout-card__summary-label">WHAT YOU GET</span><ul className="checkout-card__benefits">{tierCopy.points.map((point)=><li key={point}>✓ {point}</li>)}</ul></div><div className="checkout-card__billing"><span>CHARGE TODAY</span><strong>{formatProductPrice(product)}</strong><small>{requestedProduct==='sell-in-dms-core'?'One-time payment':requestedProduct==='sell-in-dms-pro'?'$29/mo equivalent · billed annually':'$49/mo equivalent · billed annually'}</small></div></div>}
+        {productError&&<div className="form-error">{productError}</div>}{configurationError&&<div className="form-error">{configurationError}</div>}
         <form onSubmit={startPayment}>
           <div className="checkout-card__heading"><span>01</span><div><p>SECURE CHECKOUT</p><h2>{user?'Ready to pay securely':'Enter your details to continue'}</h2></div></div>
-          <label className="field-label">Full name<input required value={fullName} onChange={(event)=>setFullName(event.target.value)} placeholder="Your full name" /></label>
-          <label className="field-label">Email<input required type="email" value={user?.email||email} onChange={(event)=>setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com" /></label>
+          <label className="field-label">Full name<input required value={fullName} onChange={(event)=>setFullName(event.target.value)} placeholder="Your full name"/></label>
+          <label className="field-label">Email<input required type="email" value={user?.email||email} onChange={(event)=>setEmail(event.target.value)} disabled={Boolean(user?.email)} placeholder="you@example.com"/></label>
           <div className="payment-method"><div><b>PAY</b><span><strong>Paystack</strong><small>Secure payment</small></span></div><i>Selected</i></div>
           <button disabled={!product||submitting} className="button button--accent button--full" type="submit">{submitting?'Connecting to Paystack…':'Pay '+(product?formatProductPrice(product):'')} <span>→</span></button>
           <p className="checkout-card__legal">You do not need an account before paying. After payment, use this same email to receive a secure sign-in link and unlock your verified access.</p>
-          {error && <div className="form-error">{error}</div>}
-          {user && <button type="button" className="quiet-button checkout-card__signout" onClick={async()=>{await supabase?.auth.signOut();await refreshEntitlement();navigate('/checkout?product='+encodeURIComponent(requestedProduct));}}>Use a different account</button>}
+          {error&&<div className="form-error">{error}</div>}
+          {user&&<button type="button" className="quiet-button checkout-card__signout" onClick={async()=>{await supabase?.auth.signOut();await refreshEntitlement();navigate('/checkout?product='+encodeURIComponent(requestedProduct));}}>Use a different account</button>}
         </form>
-      </section></div></PageFrame>;"""
-          s,n=re.subn(card,newcard,s,count=1,flags=re.S)
+      </section></div></PageFrame>;""",s,count=1,flags=re.S)
           if n!=1: raise SystemExit("checkout card not found")
-
           s=s.replace("function AuthPanel({ supabase, purpose = 'continue' }: { supabase: SupabaseClient | null; purpose?: string }) {\n  const [email, setEmail] = useState('');","function AuthPanel({ supabase, purpose = 'continue', initialEmail = '' }: { supabase: SupabaseClient | null; purpose?: string; initialEmail?: string }) {\n  const [email, setEmail] = useState(initialEmail);",1)
           s=s.replace("  const reference = params.get('reference');\n  const check = useCallback","  const reference = params.get('reference');\n  const [checkoutEmail] = useState(() => sessionStorage.getItem('sellindms_checkout_email') || '');\n  const check = useCallback",1)
           s=s.replace('<AuthPanel supabase={supabase} purpose="check your payment status" />','<AuthPanel supabase={supabase} purpose="check your payment status and unlock access" initialEmail={checkoutEmail} />',1)
@@ -79,24 +66,17 @@ jobs:
           p=Path("server/index.ts"); s=p.read_text()
           marker="app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {"
           helper="""const getOrCreatePaymentUser = async (email: string, fullName: string) => {
-  const admin = getAdminClient();
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data: created, error: createError } = await admin.auth.admin.createUser({ email: normalizedEmail, email_confirm: false, user_metadata: { full_name: fullName } });
-  if (created.user) return created.user;
-  if (createError && !/already registered|already exists/i.test(createError.message)) throw createError;
-  for (let page=1; page<=100; page+=1) {
-    const {data,error}=await admin.auth.admin.listUsers({page,perPage:1000});
-    if(error) throw error;
-    const found=data.users.find((candidate)=>String(candidate.email||'').toLowerCase()===normalizedEmail);
-    if(found) return found;
-    if(data.users.length<1000) break;
-  }
+  const admin=getAdminClient(); const normalizedEmail=email.trim().toLowerCase();
+  const {data:created,error:createError}=await admin.auth.admin.createUser({email:normalizedEmail,email_confirm:false,user_metadata:{full_name:fullName}});
+  if(created.user) return created.user;
+  if(createError&&!/already registered|already exists/i.test(createError.message)) throw createError;
+  for(let page=1;page<=100;page+=1){const {data,error}=await admin.auth.admin.listUsers({page,perPage:1000});if(error)throw error;const found=data.users.find((candidate)=>String(candidate.email||'').toLowerCase()===normalizedEmail);if(found)return found;if(data.users.length<1000)break;}
   throw new Error('The purchase account could not be prepared. Please try again.');
 };
 
 """
           if marker not in s: raise SystemExit("checkout route marker not found")
-          s=s.replace(marker,helper+marker,1)
+          if "const getOrCreatePaymentUser" not in s: s=s.replace(marker,helper+marker,1)
           old="""app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   const user = await authenticatedUser(req.header('authorization'));
   if (!user.email) {
@@ -111,62 +91,60 @@ jobs:
   const productSlug = typeof req.body?.productSlug === 'string' ? req.body.productSlug.trim() : 'sell-in-dms-core';
   const { product, access } = await accessForProduct(user.id, productSlug);"""
           new="""app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
-  const authorization=req.header('authorization');
-  const authenticated=authorization ? await authenticatedUser(authorization) : null;
-  const submittedEmail=typeof req.body?.email==='string' ? req.body.email.trim().toLowerCase() : '';
-  const fullName=typeof req.body?.fullName==='string' ? req.body.fullName.trim().slice(0,160) : '';
-  if(!submittedEmail && !authenticated?.email) return sendError(res,400,'EMAIL_REQUIRED','Enter the email you want to use for your purchase and access.');
-  if(!fullName) return sendError(res,400,'NAME_REQUIRED','Enter your full name before continuing to payment.');
-  const user=authenticated || await getOrCreatePaymentUser(submittedEmail,fullName);
-  const paymentEmail=user.email || submittedEmail;
-  if(!paymentEmail) return sendError(res,400,'EMAIL_REQUIRED','A valid email address is required before payment.');
-  const productSlug=typeof req.body?.productSlug==='string' ? req.body.productSlug.trim() : 'sell-in-dms-core';
-  const { product, access } = await accessForProduct(user.id, productSlug);"""
+  const authorization=req.header('authorization'); const authenticated=authorization?await authenticatedUser(authorization):null;
+  const submittedEmail=typeof req.body?.email==='string'?req.body.email.trim().toLowerCase():'';
+  const fullName=typeof req.body?.fullName==='string'?req.body.fullName.trim().slice(0,160):'';
+  if(!submittedEmail&&!authenticated?.email)return sendError(res,400,'EMAIL_REQUIRED','Enter the email you want to use for your purchase and access.');
+  if(!fullName)return sendError(res,400,'NAME_REQUIRED','Enter your full name before continuing to payment.');
+  const user=authenticated||await getOrCreatePaymentUser(submittedEmail,fullName); const paymentEmail=user.email||submittedEmail;
+  if(!paymentEmail)return sendError(res,400,'EMAIL_REQUIRED','A valid email address is required before payment.');
+  const productSlug=typeof req.body?.productSlug==='string'?req.body.productSlug.trim():'sell-in-dms-core';
+  const {product,access}=await accessForProduct(user.id,productSlug);"""
           if old not in s: raise SystemExit("checkout route body not found")
-          s=s.replace(old,new,1)
-          s=s.replace("      email: user.email,\n      fullName,\n      redirectUrl:","      email: paymentEmail,\n      fullName,\n      redirectUrl:",1)
-          p.write_text(s)
+          s=s.replace(old,new,1).replace("      email: user.email,
+      fullName,
+      redirectUrl:","      email: paymentEmail,
+      fullName,
+      redirectUrl:",1); p.write_text(s)
 
           p=Path("client/src/styles/global.css"); s=p.read_text()
-          for a,b in {
+          reps={
             ".compare { padding: 118px 0;":".compare { padding: 82px 0;",
-            ".reply-block { min-height: 240px; padding: 27px; }":".reply-block { min-height: 210px; padding: 30px; }",
+            ".reply-block { min-height: 240px; padding: 27px; }":".reply-block { min-height: 210px; padding: 30px;",
             ".included { display: grid; grid-template-columns: .82fr 1.18fr; gap: 105px; padding: 125px 0; }":".included { display: grid; grid-template-columns: .82fr 1.18fr; gap: 105px; padding: 92px 0; }",
             ".pricing { padding-top: 7rem; padding-bottom: 7rem; }":".pricing { padding-top: 4.5rem; padding-bottom: 5rem; }",
-            ".pricing__heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr); gap: 2rem; align-items: end; margin: 1rem 0 2.5rem; }":".pricing__heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr); gap: 2rem; align-items: end; margin: .8rem 0 2rem; }",
             ".pricing__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: stretch; }":".pricing__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: stretch; }",
-            ".pricing-card { display: flex; flex-direction: column; padding: 1.5rem; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.045); min-height: 100%; }":".pricing-card { display: flex; flex-direction: column; padding: 2rem; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.045); min-height: 100%; }",
-            ".checkout-layout { display: grid; grid-template-columns: .88fr 1.12fr; gap: clamp(45px, 9vw, 135px); align-items: start; padding-top: 30px; }":".checkout-layout { display: grid; grid-template-columns: minmax(0,.92fr) minmax(420px,1.08fr); gap: clamp(30px,5vw,72px); align-items: start; padding-top: 10px; }",
-            ".checkout-intro { display: grid; gap: 55px; padding: 20px 0; }":".checkout-intro { display: grid; gap: 32px; padding: 10px 0; }",
-            ".checkout-points { display: grid; gap: 12px; padding-top: 34px; border-top: 1px solid var(--line); color: #59574f; font-size: 12px; }":".checkout-points { display: grid; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line); color: #59574f; font-size: 12px; }",
-            ".checkout-card__product { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }":".checkout-card__product { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }"
-          }.items():
+            ".pricing-card { display: flex; flex-direction: column; padding: 1.5rem;":".pricing-card { display: flex; flex-direction: column; padding: 2rem;",
+            ".checkout-layout { display: grid; grid-template-columns: .88fr 1.12fr; gap: clamp(45px, 9vw, 135px); align-items: start; padding-top: 30px; }":".checkout-layout { display:grid; grid-template-columns:minmax(0,.92fr) minmax(420px,1.08fr); gap:clamp(30px,5vw,72px); align-items:start; padding-top:10px; }",
+            ".checkout-intro { display: grid; gap: 55px; padding: 20px 0; }":".checkout-intro { display:grid; gap:32px; padding:10px 0; }",
+            ".checkout-points { display: grid; gap: 12px; padding-top: 34px;":".checkout-points { display:grid; gap:12px; padding-top:22px;",
+            ".checkout-card__product { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }":".checkout-card__product { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding-bottom:20px; border-bottom:1px solid var(--line); }"
+          }
+          for a,b in reps.items():
             if a not in s: raise SystemExit("CSS rule not found: "+a)
             s=s.replace(a,b,1)
           anchor=".checkout-card__heading { display: flex; align-items: center; gap: 13px; margin: 27px 0 21px; }"
-          extra=""".checkout-card__summary { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; margin:20px 0 4px; padding:18px 0; border-bottom:1px solid var(--line); }
-.checkout-card__summary-label,.checkout-card__billing>span { display:block; color:var(--muted); font-size:9px; font-weight:600; letter-spacing:.12em; }
-.checkout-card__benefits { display:grid; gap:8px; margin:10px 0 0; padding:0; list-style:none; color:#59574f; font-size:12px; line-height:1.55; }
-.checkout-card__benefits li::first-letter { color:var(--success); }
-.checkout-card__billing { min-width:135px; padding-left:18px; border-left:1px solid var(--line); }
-.checkout-card__billing strong { display:block; margin-top:7px; color:var(--accent-deep); font:600 24px/1 Manrope,sans-serif; letter-spacing:-.045em; }
-.checkout-card__billing small { display:block; max-width:160px; margin-top:7px; color:var(--muted); font-size:10px; line-height:1.45; }
+          extra=""".checkout-card__summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;margin:20px 0 4px;padding:18px 0;border-bottom:1px solid var(--line)}
+.checkout-card__summary-label,.checkout-card__billing>span{display:block;color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.12em}
+.checkout-card__benefits{display:grid;gap:8px;margin:10px 0 0;padding:0;list-style:none;color:#59574f;font-size:12px;line-height:1.55}
+.checkout-card__billing{min-width:135px;padding-left:18px;border-left:1px solid var(--line)}
+.checkout-card__billing strong{display:block;margin-top:7px;color:var(--accent-deep);font:600 24px/1 Manrope,sans-serif;letter-spacing:-.045em}
+.checkout-card__billing small{display:block;max-width:160px;margin-top:7px;color:var(--muted);font-size:10px;line-height:1.45}
 """
           if anchor not in s: raise SystemExit("checkout CSS anchor not found")
           s=s.replace(anchor,extra+anchor,1)
           mobile="  .checkout-intro { gap: var(--space-6); }"
-          mobile_extra="""  .compare { padding:64px 0; }
-  .pricing { padding-top:3.5rem; padding-bottom:4rem; }
-  .pricing-card { padding:1.6rem 1.25rem; }
-  .checkout-layout { gap:28px; padding-top:0; }
-  .checkout-intro { gap:24px; padding:0; }
-  .checkout-points { padding-top:18px; }
-  .checkout-card__summary { grid-template-columns:1fr; gap:18px; }
-  .checkout-card__billing { min-width:0; padding:15px 0 0; border-top:1px solid var(--line); border-left:0; }
+          extra2="""  .compare{padding:64px 0}
+  .pricing{padding-top:3.5rem;padding-bottom:4rem}
+  .pricing-card{padding:1.6rem 1.25rem}
+  .checkout-layout{gap:28px;padding-top:0}
+  .checkout-intro{gap:24px;padding:0}
+  .checkout-points{padding-top:18px}
+  .checkout-card__summary{grid-template-columns:1fr;gap:18px}
+  .checkout-card__billing{min-width:0;padding:15px 0 0;border-top:1px solid var(--line);border-left:0}
 """
           if mobile not in s: raise SystemExit("mobile CSS anchor not found")
-          s=s.replace(mobile,mobile_extra+mobile,1)
-          p.write_text(s)
+          s=s.replace(mobile,extra2+mobile,1); p.write_text(s)
           PY
       - name: Commit patched staging branch
         run: |
