@@ -20,12 +20,19 @@ type PaystackPlan={code:string;name:string;amount:number;currency:string;interva
 export type BillingInterval='monthly'|'annually';
 const planCache=new Map<string,string>();
 const subscriptionPlanConfig=(product:ProductRecord, billingInterval:BillingInterval)=>{
-  if(product.slug==='sell-in-dms-pro') return billingInterval==='monthly'
-    ? {name:'Sell In DMs Pro Monthly',amount:29,interval:'monthly',description:'Sell In DMs Pro monthly subscription'}
-    : {name:'Sell In DMs Pro Annual',amount:Number(product.price),interval:'annually',description:'Sell In DMs Pro annual subscription'};
-  if(product.slug==='sell-in-dms-automation') return billingInterval==='monthly'
-    ? {name:'Sell In DMs Automation Monthly',amount:49,interval:'monthly',description:'Sell In DMs Automation monthly subscription'}
-    : {name:'Sell In DMs Automation Annual',amount:Number(product.price),interval:'annually',description:'Sell In DMs Automation annual subscription'};
+  const currency=String(product.currency).toUpperCase();
+  if(product.slug==='sell-in-dms-pro') {
+    const amounts = currency==='NGN' ? {monthly:38500, annual:415800} : {monthly:29, annual:Number(product.price)};
+    return billingInterval==='monthly'
+      ? {name:'Sell In DMs Pro Monthly',amount:amounts.monthly,interval:'monthly',description:'Sell In DMs Pro monthly subscription'}
+      : {name:'Sell In DMs Pro Annual',amount:amounts.annual,interval:'annually',description:'Sell In DMs Pro annual subscription'};
+  }
+  if(product.slug==='sell-in-dms-automation') {
+    const amounts = currency==='NGN' ? {monthly:65000, annual:702000} : {monthly:49, annual:Number(product.price)};
+    return billingInterval==='monthly'
+      ? {name:'Sell In DMs Automation Monthly',amount:amounts.monthly,interval:'monthly',description:'Sell In DMs Automation monthly subscription'}
+      : {name:'Sell In DMs Automation Annual',amount:amounts.annual,interval:'annually',description:'Sell In DMs Automation annual subscription'};
+  }
   return null;
 };
 export const getSubscriptionPricing=(product:ProductRecord,billingInterval:BillingInterval)=>{
