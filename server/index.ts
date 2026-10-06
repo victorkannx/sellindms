@@ -533,6 +533,20 @@ const getOrCreatePaymentUser = async (email: string, fullName: string) => {
   throw new Error('The purchase account could not be prepared. Please try again.');
 };
 
+app.post('/api/auth/email-status', asyncRoute(async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!email) return sendError(res, 400, 'EMAIL_REQUIRED', 'Enter an email address.');
+  const admin = getAdminClient();
+  for (let page = 1; page <= 100; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const registered = data.users.some((candidate) => String(candidate.email || '').toLowerCase() === email);
+    if (registered) return res.json({ registered: true });
+    if (data.users.length < 1000) break;
+  }
+  return res.json({ registered: false });
+}));
+
 app.post('/api/checkout/flutterwave', asyncRoute(async (req, res) => {
   const authorization = req.header('authorization');
   const authenticated = authorization ? await authenticatedUser(authorization) : null;
