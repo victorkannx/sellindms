@@ -5,6 +5,8 @@ export type Product = {
   price: number;
   currency: string;
   productType: 'one_time' | 'subscription';
+  monthlyPrice?: number;
+  annualPrice?: number;
 };
 
 export type Taxonomy = {
