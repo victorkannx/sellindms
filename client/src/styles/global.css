@@ -1377,11 +1377,17 @@ button, input { font-weight: 500; }
   .pricing-card ul { gap: 8px; margin-bottom: 20px; font-size: 13px; }
 }
 
-.billing-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.billing-toggle button{appearance:none;border:1px solid var(--line,#d9d5cb);background:transparent;border-radius:12px;padding:13px 12px;text-align:left;color:inherit;cursor:pointer}
-.billing-toggle button.is-active{border-color:#c99047;background:#f7f0e5}
-.billing-toggle strong,.billing-toggle small{display:block}
-.billing-toggle strong{font-size:16px}
-.billing-toggle small{margin-top:4px;color:#77736b}
-.billing-note{margin:10px 0 0;color:#77736b;font-size:13px;line-height:1.5}
-@media (max-width:600px){.billing-toggle{grid-template-columns:1fr}.billing-toggle button{padding:12px}}
+.billing-toggle{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:10px;padding:3px;border:1px solid var(--line,#d9d5cb);border-radius:999px;background:#f7f5ef}
+.billing-toggle button{appearance:none;display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;min-width:0;border:0;border-radius:999px;padding:10px 12px;background:transparent;color:var(--slate);text-align:left;cursor:pointer}
+.billing-toggle button.is-active{background:var(--ink);color:var(--white);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.billing-toggle button span{font-size:11px;font-weight:600;white-space:nowrap}
+.billing-toggle strong{font-size:12px;line-height:1;white-space:nowrap}
+.billing-toggle small{grid-column:1 / -1;margin-top:-2px;color:inherit;opacity:.7;font-size:9px}
+.billing-note{margin:9px 0 0;color:#77736b;font-size:11px;line-height:1.5}
+@media (max-width:600px){
+  .billing-toggle{grid-template-columns:1fr 1fr}
+  .billing-toggle button{grid-template-columns:1fr;gap:3px;padding:10px 11px;text-align:center}
+  .billing-toggle button span{font-size:10px}
+  .billing-toggle strong{font-size:13px}
+  .billing-toggle small{grid-column:auto}
+}
