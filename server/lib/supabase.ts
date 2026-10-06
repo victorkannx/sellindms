@@ -25,7 +25,7 @@ export const authenticatedUser = async (authorization?: string): Promise<User> =
     throw new Error('AUTH_REQUIRED');
   }
 
-  const { data, error } = await getAuthClient().auth.getUser(token);
+  const { data, error } = await (getAuthClient().auth as any).getUser(token);
   if (error || !data.user) {
     throw new Error('AUTH_REQUIRED');
   }
