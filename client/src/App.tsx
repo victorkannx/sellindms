@@ -191,12 +191,19 @@ function Landing({ configurationError }: { configurationError: string | null }) 
   useEffect(() => {
     getPublicProducts().then(setProducts).catch((error) => setProductError(error instanceof Error ? error.message : 'Product information is unavailable.'));
   }, []);
+  const productBySlug = new Map(products.map((item) => [item.slug, item]));
+  const priceFor = (slug: string, kind: 'one_time' | 'monthly' | 'annual') => {
+    const item = productBySlug.get(slug);
+    if (!item) return '—';
+    const amount = kind === 'monthly' ? (item.monthlyPrice ?? item.price) : kind === 'annual' ? (item.annualPrice ?? item.price) : item.price;
+    return formatProductPrice({ price: amount, currency: item.currency });
+  };
   const tierCards = [
     {
       slug: 'sell-in-dms-core',
       name: 'Script Library',
       label: 'START HERE',
-      price: '$9',
+      price: priceFor('sell-in-dms-core', 'one_time'),
       localPrice: '',
       description: '100 practical replies for the moments that usually stall a DM sale.',
       features: ['100 practical DM reply scripts', 'Search by real sales situation', 'Start Here guide', 'Objection Cheat Sheet', 'Copy and save scripts'],
@@ -205,8 +212,8 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       slug: 'sell-in-dms-pro',
       name: 'Sell In DMs Pro',
       label: 'BEST VALUE',
-      price: '$29/mo',
-      localPrice: '$313.20 billed annually',
+      price: priceFor('sell-in-dms-pro', 'monthly') + '/mo',
+      localPrice: priceFor('sell-in-dms-pro', 'annual') + ' billed annually',
       description: 'The full workspace for handling the sales conversation from the first message to the close.',
       features: ['Everything in Script Library', 'Full customer workspace', 'Sales-format scripts', 'AI Reply', 'Saved replies and activity'],
     },
@@ -214,8 +221,8 @@ function Landing({ configurationError }: { configurationError: string | null }) 
       slug: 'sell-in-dms-automation',
       name: 'Sell In DMs Automation',
       label: 'AUTOMATION',
-      price: '$49/mo',
-      localPrice: '$529.20 billed annually',
+      price: priceFor('sell-in-dms-automation', 'monthly') + '/mo',
+      localPrice: priceFor('sell-in-dms-automation', 'annual') + ' billed annually',
       description: 'Everything in Pro, with the future layer for connecting social conversations to automated replies.',
       features: ['Everything in Pro', 'Future social-media integrations', 'Marketing reply automation'],
     },
@@ -459,11 +466,11 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
                 <div className="billing-toggle" role="group" aria-label="Billing frequency">
                   <button type="button" className={billingInterval === 'monthly' ? 'is-active' : ''} aria-pressed={billingInterval === 'monthly'} onClick={() => setBillingInterval('monthly')}>
                     <span>Monthly</span>
-                    <strong>{requestedProduct === 'sell-in-dms-pro' ? '$29/mo' : '$49/mo'}</strong>
+                    <strong>{formatProductPrice({ price: product.monthlyPrice ?? product.price, currency: product.currency })}/mo</strong>
                   </button>
                   <button type="button" className={billingInterval === 'annually' ? 'is-active' : ''} aria-pressed={billingInterval === 'annually'} onClick={() => setBillingInterval('annually')}>
                     <span>Annual</span>
-                    <strong>{formatProductPrice(product)}</strong>
+                    <strong>{formatProductPrice({ price: product.annualPrice ?? product.price, currency: product.currency })}</strong>
                     <small>Save 10%</small>
                   </button>
                 </div>
