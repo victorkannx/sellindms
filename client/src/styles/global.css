@@ -1274,6 +1274,7 @@ button, input { font-weight: 500; }
 
 
 /* Checkout refinement: more breathing room, clearer payment guidance, no cramped mobile stacking. */
+/* Staging runtime aligned to Vercel Node 22. */
 .checkout-status {
   display: grid;
   gap: 6px;
