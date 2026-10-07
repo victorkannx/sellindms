@@ -487,7 +487,7 @@ function Checkout({ supabase, user, entitlement, accessLoading, configurationErr
       sessionStorage.setItem('sellindms_checkout_email', paymentEmail);
       sessionStorage.setItem('sellindms_checkout_product', requestedProduct);
       sessionStorage.setItem('sellindms_checkout_billing', billingInterval);
-      const response = await fetch('/api/checkout/flutterwave', {
+      const response = await fetch('/api/checkout/paystack', {
         method: 'POST',
         headers,
         body: JSON.stringify({ fullName: fullName.trim(), email: paymentEmail, productSlug: requestedProduct, billingInterval }),
