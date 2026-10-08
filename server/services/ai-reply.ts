@@ -564,7 +564,7 @@ export const generateAiReply = async (input: AiReplyPromptInput): Promise<AiRepl
         messages: buildAiReplyMessages(input),
         response_format: outputSchema,
         max_completion_tokens: 1_200,
-        reasoning: { effort: 'low' },
+        reasoning_effort: 'low',
       }),
       signal: controller.signal,
     });
