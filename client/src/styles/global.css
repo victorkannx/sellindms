@@ -362,8 +362,9 @@ h1 em, h2 em { color: var(--accent); font-style: normal; }
 
 @media (max-width: 640px) {
   .shell, .simple-page__header, .simple-page__content { width: min(100% - 32px, 1120px); }
-  .marketing-nav { height: 72px; }
-  .marketing-nav__actions > a:not(.button) { display: none; }
+  .marketing-nav { height: auto; padding: 15px 0 18px; flex-wrap: wrap; gap: 14px; }
+  .marketing-nav__actions { width: 100%; justify-content: space-between; gap: 14px; font-size: 11px; }
+  .marketing-nav__actions > a:not(.button) { display: inline-flex; align-items: center; }
   .hero { min-height: auto; padding: 55px 0 76px; }
   .hero__copy h1 { font-size: clamp(45px, 14.4vw, 64px); }
   .hero__copy > p { font-size: 15px; }
