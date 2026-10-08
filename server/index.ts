@@ -624,7 +624,7 @@ app.get('/api/payments/paystack/callback', asyncRoute(async (req, res) => {
   try {
     const verifiedTransaction = await verifyPaystackTransaction(verificationReference);
     await fulfillVerifiedTransaction(verifiedTransaction);
-    return res.redirect(toPaymentStatusPath(true, verifiedTransaction.tx_ref));
+    return res.redirect(safeAppOrigin() + '/signin?payment=success&reference=' + encodeURIComponent(verifiedTransaction.tx_ref));
   } catch {
     return res.redirect(toPaymentStatusPath(false, reference || transactionId));
   }
