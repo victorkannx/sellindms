@@ -241,6 +241,7 @@ function Landing({ configurationError }: { configurationError: string | null }) 
         <Brand inverted />
         <div className="marketing-nav__actions">
           <a href="#how-it-works">How it works</a>
+          <Link to="/signin">Sign in</Link>
           <a className="button button--small button--light" href="#pricing">Get Sell In DMs <span>→</span></a>
         </div>
       </header>
