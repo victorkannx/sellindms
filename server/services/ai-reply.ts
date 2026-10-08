@@ -562,9 +562,8 @@ export const generateAiReply = async (input: AiReplyPromptInput): Promise<AiRepl
       body: JSON.stringify({
         model: provider.model,
         messages: buildAiReplyMessages(input),
-        response_format: outputSchema,
-        max_completion_tokens: 1_200,
-        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        max_completion_tokens: 3_000,
       }),
       signal: controller.signal,
     });
