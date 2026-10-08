@@ -1392,3 +1392,104 @@ button, input { font-weight: 500; }
   .billing-toggle strong{font-size:13px}
   .billing-toggle small{grid-column:auto}
 }
+
+
+/* Homepage mobile navigation */
+.marketing-nav { position: relative; }
+.marketing-nav__menu-toggle,
+.marketing-nav__mobile-menu { display: none; }
+
+@media (max-width: 640px) {
+  .marketing-nav {
+    height: 72px;
+    padding: 0;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .marketing-nav__actions {
+    display: none;
+  }
+
+  .marketing-nav__menu-toggle {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 5px;
+    width: 42px;
+    height: 42px;
+    padding: 10px;
+    border: 1px solid #4a4842;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--white);
+  }
+
+  .marketing-nav__menu-toggle span {
+    display: block;
+    width: 19px;
+    height: 1.5px;
+    background: currentColor;
+    transition: transform .18s ease, opacity .18s ease;
+  }
+
+  .marketing-nav__menu-toggle.is-open span:nth-child(1) {
+    transform: translateY(6.5px) rotate(45deg);
+  }
+
+  .marketing-nav__menu-toggle.is-open span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .marketing-nav__menu-toggle.is-open span:nth-child(3) {
+    transform: translateY(-6.5px) rotate(-45deg);
+  }
+
+  .marketing-nav__mobile-menu {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% - 1px);
+    right: 0;
+    left: 0;
+    display: grid;
+    gap: 0;
+    padding: 8px;
+    border: 1px solid #3d3b36;
+    background: #1b1a17;
+    box-shadow: 0 18px 40px rgba(0,0,0,.32);
+  }
+
+  .marketing-nav__mobile-menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 0 14px;
+    border-bottom: 1px solid #34322e;
+    color: #eeeae2;
+    font-size: 12px;
+  }
+
+  .marketing-nav__mobile-menu a:last-child {
+    border-bottom: 0;
+    background: var(--accent);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .marketing-nav__mobile-menu a span {
+    color: var(--accent);
+    font-size: 14px;
+  }
+
+  .marketing-nav__mobile-menu a:last-child span {
+    color: var(--ink);
+  }
+}
+
+@media (min-width: 641px) {
+  .marketing-nav__menu-toggle,
+  .marketing-nav__mobile-menu {
+    display: none;
+  }
+}

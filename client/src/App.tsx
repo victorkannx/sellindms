@@ -194,6 +194,7 @@ function ScrollToTop() {
 
 function Landing({ configurationError }: { configurationError: string | null }) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   useEffect(() => {
     getPublicProducts().then(setProducts).catch((error) => setProductError(error instanceof Error ? error.message : 'Product information is unavailable.'));
@@ -244,6 +245,24 @@ function Landing({ configurationError }: { configurationError: string | null }) 
           <Link to="/signin">Sign in</Link>
           <a className="button button--small button--light" href="#pricing">Get Sell In DMs <span>→</span></a>
         </div>
+        <button
+          className={`marketing-nav__menu-toggle${mobileMenuOpen ? ' is-open' : ''}`}
+          type="button"
+          aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        {mobileMenuOpen && (
+          <nav className="marketing-nav__mobile-menu" aria-label="Mobile navigation">
+            <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>How it works <span>↓</span></a>
+            <Link to="/signin" onClick={() => setMobileMenuOpen(false)}>Sign in <span>→</span></Link>
+            <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>Get Sell In DMs <span>→</span></a>
+          </nav>
+        )}
       </header>
 
       <section className="hero shell">
