@@ -364,7 +364,7 @@ function AuthPanel({ supabase, purpose = 'continue', initialEmail = '', shouldCr
       setError(reason instanceof Error ? reason.message : 'We could not send that sign-in link.');
     }
   };
-  if (submitted) return <div className="auth-success"><span>✓</span><h3>Check your inbox.</h3><p>We sent a secure sign-in link to <strong>{email}</strong>. Return here after you open it.</p></div>;
+  if (submitted) return <div className="auth-success"><span>✓</span><h3>Check your inbox.</h3><p>We sent a secure sign-in link to <strong>{email}</strong>. Open it and we’ll take you to your Sell In DMs library.</p></div>;
   return <form className="auth-form" onSubmit={submit}><label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></label><button className="button button--accent" type="submit">Email me a sign-in link <span>→</span></button><p>Sign in to {purpose}. This does not grant library access—access is verified separately.</p>{error && <div className="form-error">{error}</div>}</form>;
 }
 
@@ -592,7 +592,7 @@ function PaymentResult({ supabase, user, successful }: { supabase: SupabaseClien
   }, [reference, successful, supabase, user]);
   useEffect(() => { void check(); }, [check]);
 
-  if (successful && !user) return <PageFrame><div className="access-message"><span>↳</span><h1>One more secure step.</h1><p>Payment returns are not proof of access. Sign in to check the verified payment status attached to your account.</p><AuthPanel supabase={supabase} purpose="check your payment status and unlock access" initialEmail={checkoutEmail} /></div></PageFrame>;
+  if (successful && !user) return <PageFrame><div className="access-message"><span>↳</span><h1>Payment received.</h1><p>Your payment has been verified. Sign in with the email you used at checkout and we’ll confirm your active access before opening your library.</p><AuthPanel supabase={supabase} purpose="finish setting up your access" initialEmail={checkoutEmail} /></div></PageFrame>;
   if (!successful) return <PageFrame><div className="access-message"><span>×</span><h1>Payment wasn&apos;t completed.</h1><p>No access has been granted. You can return to checkout whenever you&apos;re ready.</p><Link className="button button--accent" to="/checkout">Return to checkout <span>→</span></Link></div></PageFrame>;
   if (loading) return <PageFrame><LoadingState label="Checking verified payment status" /></PageFrame>;
   if (error) return <PageFrame><div className="access-message"><span>!</span><h1>We couldn&apos;t verify that yet.</h1><p>{error}</p><button className="button button--accent" onClick={() => void check()}>Check again <span>↻</span></button></div></PageFrame>;
