@@ -4,6 +4,8 @@ export const runtimeConfig = {
   supabaseUrl: required('SUPABASE_URL'),
   supabaseAnonKey: required('SUPABASE_ANON_KEY'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
+  aiGatewayApiKey: required('AI_GATEWAY_API_KEY'),
+  aiGatewayModel: required('AI_GATEWAY_MODEL'),
   openaiApiKey: required('OPENAI_API_KEY'),
   openaiApiBase: required('OPENAI_API_BASE'),
   builtInForgeApiUrl: required('BUILT_IN_FORGE_API_URL'),
