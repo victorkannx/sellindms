@@ -62,6 +62,7 @@ type ChatMessage = {
 type ChatCompletionResponse = {
   error?: unknown;
   choices?: Array<{
+    finish_reason?: string | null;
     message?: {
       content?: string | null;
     };
@@ -522,17 +523,42 @@ const parseProviderOutput = (content: string, input: AiReplyPromptInput): AiRepl
   return { reply, whyThisWorks, nextMove, recommendedScriptCode };
 };
 
+const providerErrorMetadata = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object') return {};
+  const root = value as Record<string, unknown>;
+  const error = root.error && typeof root.error === 'object'
+    ? root.error as Record<string, unknown>
+    : root;
+  const metadata: Record<string, string> = {};
+  for (const key of ['type', 'code', 'param']) {
+    const field = error[key];
+    if (typeof field === 'string' && field.trim()) metadata[key] = field.trim().slice(0, 80);
+  }
+  return metadata;
+};
+
 const chatCompletionUrl = (baseUrl: string) => {
   const normalized = baseUrl.trim().replace(/\/+$/, '').replace(/\/v1$/, '');
   return `${normalized}/v1/chat/completions`;
 };
 
 const getProvider = () => {
+  if (runtimeConfig.aiGatewayApiKey) {
+    const configuredModel = runtimeConfig.aiGatewayModel || runtimeConfig.aiReplyModel || 'openai/gpt-4.1-mini';
+    return {
+      endpoint: 'https://ai-gateway.vercel.sh/v1/chat/completions',
+      apiKey: runtimeConfig.aiGatewayApiKey,
+      model: configuredModel.includes('/') ? configuredModel : `openai/${configuredModel}`,
+      providerName: 'vercel-ai-gateway',
+    };
+  }
+
   if (runtimeConfig.openaiApiKey) {
     return {
       endpoint: chatCompletionUrl(runtimeConfig.openaiApiBase || 'https://api.openai.com/v1'),
       apiKey: runtimeConfig.openaiApiKey,
       model: runtimeConfig.aiReplyModel || 'gpt-5-mini',
+      providerName: 'openai-compatible',
     };
   }
 
@@ -541,6 +567,7 @@ const getProvider = () => {
       endpoint: chatCompletionUrl(runtimeConfig.builtInForgeApiUrl),
       apiKey: runtimeConfig.builtInForgeApiKey,
       model: runtimeConfig.aiReplyModel || 'gpt-5-mini',
+      providerName: 'built-in-forge',
     };
   }
 
@@ -569,18 +596,45 @@ export const generateAiReply = async (input: AiReplyPromptInput): Promise<AiRepl
     });
 
     if (!response.ok) {
-      console.error('[sell-in-dms][ai-reply] provider request failed', { status: response.status });
+      let providerError: unknown;
+      try { providerError = await response.clone().json(); } catch { /* Non-JSON provider error body. */ }
+      console.error('[sell-in-dms][ai-reply] provider request failed', {
+        status: response.status,
+        provider: provider.providerName,
+        model: provider.model,
+        ...providerErrorMetadata(providerError),
+      });
       throw new AiReplyProviderError();
     }
 
     const payload = await response.json() as ChatCompletionResponse;
     if (payload.error) {
-      console.error('[sell-in-dms][ai-reply] provider returned an error payload');
+      console.error('[sell-in-dms][ai-reply] provider returned an error payload', {
+        provider: provider.providerName,
+        model: provider.model,
+        ...providerErrorMetadata(payload.error),
+      });
       throw new AiReplyProviderError();
     }
-    const content = payload.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) throw new AiReplyOutputError();
-    return parseProviderOutput(content, input);
+    const choice = payload.choices?.[0];
+    const content = choice?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      console.error('[sell-in-dms][ai-reply] provider returned no message content', {
+        provider: provider.providerName,
+        model: provider.model,
+        finishReason: choice?.finish_reason || 'unknown',
+        hasChoice: Boolean(choice),
+      });
+      throw new AiReplyOutputError();
+    }
+    try {
+      return parseProviderOutput(content, input);
+    } catch (error) {
+      if (error instanceof AiReplyOutputError) {
+        console.error('[sell-in-dms][ai-reply] provider output failed validation', { provider: provider.providerName, model: provider.model });
+      }
+      throw error;
+    }
   } catch (error) {
     if (error instanceof AiReplyConfigurationError || error instanceof AiReplyProviderError || error instanceof AiReplyOutputError) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
